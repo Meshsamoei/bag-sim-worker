@@ -164,7 +164,7 @@ async function createSession(db, userId) {
 async function getSessionUser(db, token) {
     if (!token) return null;
     const row = await db.prepare(
-        `SELECT s.token, s.expires_at, u.id, u.phone, u.display_name, u.role
+        `SELECT s.token, s.expires_at, u.id, u.phone, u.display_name, u.role, u.shop_id
          FROM sessions s JOIN users u ON u.id = s.user_id
          WHERE s.token = ?`
     ).bind(token).first();
@@ -187,14 +187,15 @@ function publicUser(u) {
         id: u.id,
         phone: u.phone,
         display_name: u.display_name,
-        role: u.role
+        role: u.role,
+        shop_id: u.shop_id || 'default'
     };
 }
 
 // ================================================================
 //  ROUND DATA GENERATION
 // ================================================================
-async function generateRoundData(db, isGlobal = false, totalPool = 0) {
+async function generateRoundData(db, isGlobal = false, totalPool = 0, shopId = 'default') {
     const timestampTag = new Date().toISOString();
     const clientSeed = isGlobal ?
         `global_round_t_${timestampTag}` :
@@ -214,11 +215,11 @@ async function generateRoundData(db, isGlobal = false, totalPool = 0) {
         return row;
     } else {
         const stmt = db.prepare(
-            `INSERT INTO local_rounds (crash_multiplier, total_pool, server_seed, server_seed_hash, client_seed, is_demo, created_at) VALUES (?, ?, ?, ?, ?, 0, datetime('now'))`
-        ).bind(crashMultiplier, totalPool, serverSeed, serverSeedHash, clientSeed);
+            `INSERT INTO local_rounds (crash_multiplier, total_pool, server_seed, server_seed_hash, client_seed, shop_id, is_demo, created_at) VALUES (?, ?, ?, ?, ?, ?, 0, datetime('now'))`
+        ).bind(crashMultiplier, totalPool, serverSeed, serverSeedHash, clientSeed, shopId);
         const res = await stmt.run();
 
-        const row = await db.prepare(`SELECT id, crash_multiplier, total_pool, server_seed, server_seed_hash, client_seed, created_at FROM local_rounds WHERE id = ?`).bind(res.meta.last_row_id).first();
+        const row = await db.prepare(`SELECT id, crash_multiplier, total_pool, server_seed, server_seed_hash, client_seed, shop_id, created_at FROM local_rounds WHERE id = ?`).bind(res.meta.last_row_id).first();
         return row;
     }
 }
@@ -279,6 +280,7 @@ export default {
                 const password = body.password;
                 const displayName = (body.display_name || '').toString().trim().substring(0, 40) || null;
                 const role = ['teller', 'cashier', 'admin'].includes(body.role) ? body.role : 'cashier';
+                const shopId = String(body.shop_id || 'default').substring(0, 64);
 
                 if (!phone) {
                     return Response.json(
@@ -305,8 +307,8 @@ export default {
                 const hash = await hashPassword(password, salt);
 
                 const res = await env.DB.prepare(
-                    `INSERT INTO users (phone, password_hash, password_salt, display_name, role) VALUES (?, ?, ?, ?, ?)`
-                ).bind(phone, hash, salt, displayName, role).run();
+                    `INSERT INTO users (phone, password_hash, password_salt, display_name, role, shop_id) VALUES (?, ?, ?, ?, ?, ?)`
+                ).bind(phone, hash, salt, displayName, role, shopId).run();
 
                 const userId = res.meta.last_row_id;
                 const session = await createSession(env.DB, userId);
@@ -315,7 +317,7 @@ export default {
                     success: true,
                     token: session.token,
                     expires_at: session.expires_at,
-                    user: { id: userId, phone, display_name: displayName, role }
+                    user: { id: userId, phone, display_name: displayName, role, shop_id: shopId }
                 }, { headers: corsHeaders });
             }
 
@@ -333,7 +335,7 @@ export default {
                 }
 
                 const user = await env.DB.prepare(
-                    `SELECT id, phone, password_hash, password_salt, display_name, role FROM users WHERE phone = ?`
+                    `SELECT id, phone, password_hash, password_salt, display_name, role, shop_id FROM users WHERE phone = ?`
                 ).bind(phone).first();
 
                 if (!user) {
@@ -463,6 +465,7 @@ export default {
                 const totalPool = Number(body.total_pool) || 0.0;
                 const isGlobal = body.is_global || false;
                 const slips = body.slips || [];
+                const shopId = String(body.shop_id || sessionUser.shop_id || 'default').substring(0, 64);
 
                 if (!isGlobal && (!Array.isArray(slips) || slips.length === 0)) {
                     return Response.json(
@@ -471,26 +474,28 @@ export default {
                     );
                 }
 
-                const round = await generateRoundData(env.DB, isGlobal, totalPool);
+                const round = await generateRoundData(env.DB, isGlobal, totalPool, shopId);
                 const roundId = round.id;
 
                 for (const slip of slips) {
                     const ticketCode = `TKT-${Math.floor(1000 + Math.random() * 9000)}`;
                     await env.DB.prepare(
-                        `INSERT INTO local_bets (round_id, ticket_code, customer_name, stake, multiplier, status, created_by) VALUES (?, ?, ?, ?, ?, 'pending', ?)`
+                        `INSERT INTO local_bets (round_id, ticket_code, customer_name, stake, multiplier, status, created_by, shop_id) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)`
                     ).bind(
                         roundId,
                         ticketCode,
                         (slip.customer_name || slip.name || 'Walk-in Player').substring(0, 32),
                         Number(slip.stake),
                         Number(slip.multiplier || 1.00),
-                        sessionUser.id
+                        sessionUser.id,
+                        shopId
                     ).run();
                 }
 
                 return Response.json({
                     success: true,
                     round_id: roundId,
+                    shop_id: shopId,
                     server_seed_hash: round.server_seed_hash
                 }, { headers: corsHeaders });
             }
@@ -543,12 +548,18 @@ export default {
                 const mode = url.searchParams.get('mode') || 'local';
                 const isGlobal = mode === 'global';
                 const tableName = isGlobal ? 'global_rounds' : 'local_rounds';
+                const shopId = url.searchParams.get('shop_id') || 'default';
 
-                let query = isGlobal ?
-                    `SELECT id, crash_multiplier, server_seed_hash, client_seed, created_at FROM ${tableName} ORDER BY id DESC LIMIT 1` :
-                    `SELECT id, crash_multiplier, total_pool, server_seed_hash, client_seed, created_at FROM ${tableName} ORDER BY id DESC LIMIT 1`;
+                let query, params;
+                if (isGlobal) {
+                    query = `SELECT id, crash_multiplier, server_seed_hash, client_seed, created_at FROM ${tableName} ORDER BY id DESC LIMIT 1`;
+                    params = [];
+                } else {
+                    query = `SELECT id, crash_multiplier, total_pool, server_seed_hash, client_seed, created_at FROM ${tableName} WHERE shop_id = ? ORDER BY id DESC LIMIT 1`;
+                    params = [shopId];
+                }
 
-                let round = await env.DB.prepare(query).first();
+                let round = await env.DB.prepare(query).bind(...params).first();
 
                 if (isGlobal) {
                     const now = Date.now();
@@ -592,6 +603,7 @@ export default {
 
                 const publicRound = round ? {
                     id: round.id,
+                    shop_id: round.shop_id || 'default',
                     total_pool: round.total_pool || 0,
                     server_seed_hash: round.server_seed_hash,
                     client_seed: round.client_seed,
@@ -613,12 +625,23 @@ export default {
 
             if (path === '/api/history' && request.method === 'GET') {
                 const mode = url.searchParams.get('mode') || 'local';
+                const isGlobal = mode === 'global';
                 const tableName = mode === 'global' ? 'global_rounds' : 'local_rounds';
+                const shopId = url.searchParams.get('shop_id') || 'default';
                 const selectColumns = mode === 'global' ?
                     'id, crash_multiplier, server_seed, server_seed_hash, client_seed, created_at' :
-                    'id, crash_multiplier, total_pool, server_seed, server_seed_hash, client_seed, created_at';
+                    'id, crash_multiplier, total_pool, server_seed, server_seed_hash, client_seed, shop_id, created_at';
 
-                const { results } = await env.DB.prepare(`SELECT ${selectColumns} FROM ${tableName} ORDER BY id DESC`).all();
+                let query, params;
+                if (isGlobal) {
+                    query = `SELECT ${selectColumns} FROM ${tableName} ORDER BY id DESC`;
+                    params = [];
+                } else {
+                    query = `SELECT ${selectColumns} FROM ${tableName} WHERE shop_id = ? ORDER BY id DESC`;
+                    params = [shopId];
+                }
+
+                const { results } = await env.DB.prepare(query).bind(...params).all();
                 let filtered = results || [];
 
                 // Hide latest round while still in-flight
@@ -774,13 +797,14 @@ export default {
             if (path === '/api/round' && request.method === 'GET') {
                 const roundId = url.searchParams.get('id');
                 const mode = url.searchParams.get('mode') || 'local';
+                const shopId = url.searchParams.get('shop_id') || 'default';
 
                 if (!roundId) {
                     return Response.json({ error: 'Missing round id' }, { status: 400, headers: corsHeaders });
                 }
 
                 if (mode === 'local') {
-                    const round = await env.DB.prepare(`SELECT * FROM local_rounds WHERE id = ?`).bind(roundId).first();
+                    const round = await env.DB.prepare(`SELECT * FROM local_rounds WHERE id = ? AND shop_id = ?`).bind(roundId, shopId).first();
                     if (!round) return Response.json({ error: 'Round not found' }, { status: 404, headers: corsHeaders });
 
                     const { roundEndsAt } = computeRoundTiming(round);
@@ -836,7 +860,8 @@ export default {
                 }
 
                 const body = await request.json().catch(() => ({}));
-                const { roundId, name, stake, multiplier } = body;
+                const { roundId, name, stake, multiplier, shop_id } = body;
+                const effectiveShopId = String(shop_id || sessionUser.shop_id || 'default').substring(0, 64);
 
                 if (!roundId || !stake || !multiplier) {
                     return Response.json({ error: 'Missing required bet parameters' }, { status: 400, headers: corsHeaders });
@@ -844,15 +869,16 @@ export default {
 
                 const ticketCode = `TKT-${Math.floor(1000 + Math.random() * 9000)}`;
                 const stmt = env.DB.prepare(
-                    `INSERT INTO local_bets (round_id, ticket_code, customer_name, stake, multiplier, status, created_by) VALUES (?, ?, ?, ?, ?, 'pending', ?)`
-                ).bind(roundId, ticketCode, name || 'Walk-in Player', Number(stake), Number(multiplier), sessionUser.id);
+                    `INSERT INTO local_bets (round_id, ticket_code, customer_name, stake, multiplier, status, created_by, shop_id) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)`
+                ).bind(roundId, ticketCode, name || 'Walk-in Player', Number(stake), Number(multiplier), sessionUser.id, effectiveShopId);
 
                 const res = await stmt.run();
 
                 return Response.json({
                     success: true,
                     ticket_id: ticketCode,
-                    bet_db_id: res.meta.last_row_id
+                    bet_db_id: res.meta.last_row_id,
+                    shop_id: effectiveShopId
                 }, { headers: corsHeaders });
             }
 
@@ -870,7 +896,8 @@ export default {
                 }
 
                 const body = await request.json().catch(() => ({}));
-                const { roundId, ticketId, settlement_method } = body;
+                const { roundId, ticketId, settlement_method, shop_id } = body;
+                const effectiveShopId = String(shop_id || sessionUser.shop_id || 'default').substring(0, 64);
 
                 if (!roundId || !ticketId) {
                     return Response.json({ error: 'Missing settlement parameters' }, { status: 400, headers: corsHeaders });
@@ -879,8 +906,8 @@ export default {
                 const method = ['cash', 'mpesa'].includes(settlement_method) ? settlement_method : 'cash';
 
                 await env.DB.prepare(
-                    `UPDATE local_bets SET status = 'settled', settlement_method = ?, settled_by = ?, settled_at = datetime('now') WHERE round_id = ? AND (ticket_code = ? OR id = ?)`
-                ).bind(method, sessionUser.id, roundId, ticketId, ticketId).run();
+                    `UPDATE local_bets SET status = 'settled', settlement_method = ?, settled_by = ?, settled_at = datetime('now') WHERE round_id = ? AND (ticket_code = ? OR id = ?) AND shop_id = ?`
+                ).bind(method, sessionUser.id, roundId, ticketId, ticketId, effectiveShopId).run();
 
                 return Response.json({ success: true }, { headers: corsHeaders });
             }
