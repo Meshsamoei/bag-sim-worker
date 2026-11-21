@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Terminal Hub — Bag Sim Suite</title>
+    <script src="https://cdn.jsdelivr.net/npm/tailwindcss@4/dist/tailwind.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        .grid-bg {
+            background-image: linear-gradient(to right, rgba(16, 185, 129, 0.07) 1px, transparent 1px), linear-gradient(to bottom, rgba(16, 185, 129, 0.07) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+
+        .tile {
+            position: relative;
+            overflow: hidden;
+            border-radius: 1rem;
+            cursor: pointer;
+            transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+            border: 1px solid rgb(30 41 59);
+            text-align: left;
+        }
+
+        .tile-red {
+            background: linear-gradient(135deg, #1a0505 0%, #2d0a0a 100%);
+            border-color: #7f1d1d;
+        }
+
+        .tile-red:hover {
+            border-color: #dc2626;
+            box-shadow: 0 0 40px rgba(220, 38, 38, 0.2);
+        }
+
+        .art-red {
+            background: radial-gradient(circle at 70% 30%, rgba(220, 38, 38, 0.4) 0%, transparent 60%);
+        }
+
+        .tile:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.7);
+        }
+
+        .tile-emerald:hover {
+            border-color: rgb(16 185 129);
+        }
+
+        .tile-orange:hover {
+            border-color: rgb(249 115 22);
+        }
+
+        .tile-amber:hover {
+            border-color: rgb(245 158 11);
+        }
+
+        .tile-blue:hover {
+            border-color: rgb(59 130 246);
+        }
+
+        .tile-slate:hover {
+            border-color: rgb(100 116 139);
+        }
+
+        .tile-art {
+            position: absolute;
+            inset: 0;
+            opacity: 0.85;
+            transition: opacity 0.3s ease, transform 0.6s ease;
+        }
+
+        .tile:hover .tile-art {
+            opacity: 1;
+            transform: scale(1.04);
+        }
+
+        .art-emerald {
+            background: radial-gradient(circle at 30% 60%, rgba(16, 185, 129, 0.45), transparent 55%), radial-gradient(circle at 75% 30%, rgba(6, 78, 59, 0.6), transparent 60%), linear-gradient(135deg, #020617 0%, #052e2b 100%);
+        }
+
+        .art-orange {
+            background: radial-gradient(circle at 40% 50%, rgba(249, 115, 22, 0.45), transparent 55%), radial-gradient(circle at 80% 20%, rgba(154, 52, 18, 0.6), transparent 60%), linear-gradient(135deg, #020617 0%, #2b1409 100%);
+        }
+
+        .art-amber {
+            background: radial-gradient(circle at 35% 55%, rgba(245, 158, 11, 0.42), transparent 55%), radial-gradient(circle at 80% 25%, rgba(120, 53, 15, 0.6), transparent 60%), linear-gradient(135deg, #020617 0%, #2a1c05 100%);
+        }
+
+        .art-blue {
+            background: radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.4), transparent 55%), linear-gradient(135deg, #020617 0%, #0c1e3e 100%);
+        }
+
+        .art-slate {
+            background: radial-gradient(circle at 50% 50%, rgba(100, 116, 139, 0.35), transparent 55%), linear-gradient(135deg, #020617 0%, #1e293b 100%);
+        }
+
+        .tile-art::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background-image: linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+            background-size: 30px 30px;
+        }
+
+        .tile-content {
+            position: relative;
+            z-index: 2;
+            padding: 1.1rem;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .tile-price {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-family: ui-monospace, Menlo, monospace;
+            font-size: 10px;
+            color: rgb(203 213 225);
+        }
+
+        .badge-live {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.5);
+            padding: 0.15rem 0.5rem;
+            border-radius: 0.25rem;
+            font-family: ui-monospace, Menlo, monospace;
+            font-size: 10px;
+            color: rgb(52 211 153);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .badge-live::before {
+            content: "";
+            width: 6px;
+            height: 6px;
+            border-radius: 999px;
+            background: rgb(16 185 129);
+            box-shadow: 0 0 8px rgb(16 185 129);
+            animation: pulse 1.4s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.35;
+            }
+        }
+
+        .cat-tab {
+            padding: 0.5rem 0.9rem;
+            font-family: ui-monospace, Menlo, monospace;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: rgb(100 116 139);
+            border-radius: 0.25rem;
+            cursor: pointer;
+            transition: color 0.15s ease, background-color 0.15s ease;
+            white-space: nowrap;
+        }
+
+        .cat-tab:hover {
+            color: rgb(226 232 240);
+        }
+
+        .cat-tab.active {
+            color: rgb(2 6 23);
+            background: rgb(16 185 129);
+        }
+
+        .bottom-tab {
+            flex: 1;
+            padding: 0.75rem 0.5rem;
+            text-align: center;
+            font-family: ui-monospace, Menlo, monospace;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: rgb(100 116 139);
+            border-right: 1px solid rgb(30 41 59);
+            cursor: pointer;
+            transition: color 0.15s ease, background-color 0.15s ease;
+        }
+
+        .bottom-tab:last-child {
+            border-right: none;
+        }
+
+        .bottom-tab:hover {
+            color: rgb(226 232 240);
+            background: rgba(255, 255, 255, 0.02);
+        }
+    </style>
+</head>
+
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans flex flex-col justify-between grid-bg select-none">
+
+    <!-- Top bar -->
+    <header class="bg-slate-950/95 border-b border-slate-800 px-3 sm:px-6 py-3 z-20 sticky top-0 backdrop-blur-md">
+        <div class="max-w-7xl mx-auto flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3 sm:gap-6 min-w-0">
+                <div class="flex flex-col leading-none">
+                    <span class="text-[9px] sm:text-[10px] font-mono font-black tracking-widest text-orange-500">THE
+                        BAG</span>
+                    <span class="text-sm sm:text-base font-mono font-black tracking-wider text-white">SIMULATOR</span>
+                </div>
+                <nav
+                    class="hidden md:flex items-center gap-1 font-mono text-[11px] font-bold tracking-widest text-slate-400">
+                    <a href="index.html" class="px-3 py-1.5 text-emerald-400 border-b-2 border-emerald-500">HUB</a>
+                    <a href="play.html" class="px-3 py-1.5 hover:text-white transition-colors">PLAY</a>
+                    <a href="teller.html" class="px-3 py-1.5 hover:text-white transition-colors">TELLER</a>
+                    <a href="cashier.html" class="px-3 py-1.5 hover:text-white transition-colors">CASHIER</a>
+                    <a href="portal.html" class="px-3 py-1.5 hover:text-white transition-colors">PORTAL</a>
+                    <a href="display.html" class="px-3 py-1.5 hover:text-white transition-colors">SPECTATE</a>
+                    <a href="#" onclick="openShopProfile()" class="px-3 py-1.5 hover:text-white transition-colors">SHOP</a>
+                </nav>
+            </div>
+            <div class="flex items-center gap-2 sm:gap-3">
+                <div id="clock" class="hidden sm:block font-mono text-[11px] text-slate-500">--:--:--</div>
+                <div
+                    class="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 font-mono text-xs font-bold text-emerald-400">
+                    KES <span id="hub-wallet">10,000</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main grid -->
+    <main class="flex-1 w-full max-w-7xl mx-auto p-3 sm:p-6 z-10">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
+
+            <!-- LEFT column: two stacked heroes -->
+            <div class="flex flex-col gap-3 sm:gap-4">
+
+                <!-- Top: PLAY SIMULATOR -->
+                <a href="play.html" class="tile tile-emerald min-h-[220px] sm:min-h-[270px] block">
+                    <div class="tile-art art-emerald"></div>
+                    <div class="tile-content">
+                        <div class="flex items-start justify-between">
+                            <span class="badge-live">LIVE</span>
+                            <span class="tile-price">⚡ 10,000 START</span>
+                        </div>
+                        <div>
+                            <p class="font-mono text-[10px] tracking-widest text-emerald-400 mb-2">DUAL CONSOLE TERMINAL
+                            </p>
+                            <h2 class="font-mono font-black text-3xl sm:text-5xl text-white leading-tight">
+                                PLAY<br>
+                                <span class="text-emerald-400">SIMULATOR</span>
+                            </h2>
+                            <p class="text-xs sm:text-sm text-slate-400 mt-3 max-w-md font-mono">
+                                Two consoles, one wallet. Bet on the global climb, cash out before the crash.
+                            </p>
+                            <div
+                                class="mt-4 inline-flex items-center gap-2 font-mono text-xs font-bold text-emerald-400">
+                                ENTER TERMINAL
+                                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="3">
+                                    <path d="M9 5l7 7-7 7" />
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+
+                <!-- Bottom: WW3 CIVIL WARS -->
+                <a href="https://ww3.bagsim.co.ke" class="tile tile-red min-h-[220px] sm:min-h-[270px] block">
+                    <div class="tile-art art-red"></div>
+                    <div class="tile-content">
+                        <div class="flex items-start justify-between">
+                            <span class="badge-live">NEW</span>
+                            <span class="tile-price">🔥 10,000 START</span>
+                        </div>
+                        <div>
+                            <p class="font-mono text-[10px] tracking-widest text-red-400 mb-2">LAST MAN STANDING</p>
+                            <h2 class="font-mono font-black text-3xl sm:text-5xl text-white leading-tight">
+                                WW3<br>
+                                <span class="text-red-400">CIVIL WARS</span>
+                            </h2>
+                            <p class="text-xs sm:text-sm text-slate-400 mt-3 max-w-md font-mono">
+                                Pick a nation. Watch it survive. Last flag standing takes the pot.
+                            </p>
+                            <div class="mt-4 inline-flex items-center gap-2 font-mono text-xs font-bold text-red-400">
+                                LAUNCH WW3
+                                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="3">
+                                    <path d="M9 5l7 7-7 7" />
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+
+            </div>
+
+            <!-- RIGHT column: 2x2 grid -->
+            <div class="grid grid-cols-2 gap-3 sm:gap-4">
+
+                <!-- TELLER -->
+                <a href="teller.html" class="tile tile-orange min-h-[220px] sm:min-h-[270px] block">
+                    <div class="tile-art art-orange"></div>
+                    <div class="tile-content">
+                        <div class="flex items-start justify-between">
+                            <span class="tile-price">🎫</span>
+                        </div>
+                        <div>
+                            <p class="font-mono text-[9px] tracking-widest text-orange-400 mb-1">SHOP / LOCAL</p>
+                            <h3 class="font-mono font-black text-xl text-white leading-tight">
+                                TELLER<br><span class="text-orange-400">CONSOLE</span>
+                            </h3>
+                            <p class="text-[10px] text-slate-400 mt-1.5 font-mono leading-snug">
+                                Queue local round tickets. Aggregate pools. Launch.
+                            </p>
+                        </div>
+                    </div>
+                </a>
+
+                <!-- CASHIER -->
+                <a href="cashier.html" class="tile tile-amber min-h-[220px] sm:min-h-[270px] block">
+                    <div class="tile-art art-amber"></div>
+                    <div class="tile-content">
+                        <div class="flex items-start justify-between">
+                            <span class="tile-price">💰</span>
+                        </div>
+                        <div>
+                            <p class="font-mono text-[9px] tracking-widest text-amber-400 mb-1">REDEEM / SETTLE</p>
+                            <h3 class="font-mono font-black text-xl text-white leading-tight">
+                                CASHIER<br><span class="text-amber-400">TERMINAL</span>
+                            </h3>
+                            <p class="text-[10px] text-slate-400 mt-1.5 font-mono leading-snug">
+                                Settle winning tickets. Watch live teller queue.
+                            </p>
+                        </div>
+                    </div>
+                </a>
+
+                <!-- PORTAL -->
+                <a href="portal.html" class="tile tile-blue min-h-[220px] sm:min-h-[270px] block">
+                    <div class="tile-art art-blue"></div>
+                    <div class="tile-content">
+                        <div class="flex items-start justify-between">
+                            <span class="tile-price">🛡️</span>
+                        </div>
+                        <div>
+                            <p class="font-mono text-[9px] tracking-widest text-blue-400 mb-1">AUDIT</p>
+                            <h3 class="font-mono font-black text-xl text-white leading-tight">
+                                FAIRNESS<br><span class="text-blue-400">PORTAL</span>
+                            </h3>
+                            <p class="text-[10px] text-slate-400 mt-1.5 font-mono leading-snug">
+                                Verify seeds. Browse round history.
+                            </p>
+                        </div>
+                    </div>
+                </a>
+
+                <!-- DISPLAY -->
+                <a href="display.html" class="tile tile-slate min-h-[220px] sm:min-h-[270px] block">
+                    <div class="tile-art art-slate"></div>
+                    <div class="tile-content">
+                        <div class="flex items-start justify-between">
+                            <span class="tile-price">👁️</span>
+                        </div>
+                        <div>
+                            <p class="font-mono text-[9px] tracking-widest text-slate-300 mb-1">WATCH</p>
+                            <h3 class="font-mono font-black text-xl text-white leading-tight">
+                                LIVE<br><span class="text-slate-300">DISPLAY</span>
+                            </h3>
+                            <p class="text-[10px] text-slate-400 mt-1.5 font-mono leading-snug">
+                                Big-screen spectator mode.
+                            </p>
+                        </div>
+                    </div>
+                </a>
+
+            </div>
+
+        </div>
+
+        <!-- Wide spectator cards — like Civil Wars hero -->
+        <div class="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <a id="hub-local-display-card" href="#" class="tile tile-emerald min-h-[220px] sm:min-h-[320px] block hidden">
+                <div class="tile-art art-emerald"></div>
+                <div class="tile-content">
+                    <div class="flex items-start justify-between">
+                        <span class="badge-live">LOCAL</span>
+                        <span class="tile-price">🏪</span>
+                    </div>
+                    <div>
+                        <p class="font-mono text-[10px] tracking-widest text-emerald-400 mb-2">YOUR SHOP</p>
+                        <h2 class="font-mono font-black text-4xl sm:text-5xl text-white leading-tight">
+                            LOCAL<br><span class="text-emerald-400">DISPLAY</span>
+                        </h2>
+                        <p class="text-sm sm:text-base text-slate-400 mt-3 max-w-md font-mono leading-snug">
+                            Spectate your lounge's live rounds.
+                        </p>
+                        <p class="text-[10px] font-mono text-slate-500 mt-4" id="hub-local-shop-id">shop: --</p>
+                        <div class="mt-6 inline-flex items-center gap-2 font-mono text-xs font-bold text-emerald-400">
+                            ENTER LOCAL DISPLAY
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="3">
+                                <path d="M9 5l7 7-7 7" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </a>
+
+            <a id="hub-global-display-card" href="#" class="tile tile-blue min-h-[220px] sm:min-h-[320px] block hidden">
+                <div class="tile-art art-blue"></div>
+                <div class="tile-content">
+                    <div class="flex items-start justify-between">
+                        <span class="badge-live">GLOBAL</span>
+                        <span class="tile-price">🌍</span>
+                    </div>
+                    <div>
+                        <p class="font-mono text-[10px] tracking-widest text-blue-400 mb-2">AUTO-PLAY</p>
+                        <h2 class="font-mono font-black text-4xl sm:text-5xl text-white leading-tight">
+                            GLOBAL<br><span class="text-blue-400">DISPLAY</span>
+                        </h2>
+                        <p class="text-sm sm:text-base text-slate-400 mt-3 max-w-md font-mono leading-snug">
+                            Server-broadcast rounds, open to all.
+                        </p>
+                        <div class="mt-6 inline-flex items-center gap-2 font-mono text-xs font-bold text-blue-400">
+                            ENTER GLOBAL DISPLAY
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="3">
+                                <path d="M9 5l7 7-7 7" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- Stat strip below the grid -->
+        <div class="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="bg-slate-900/70 border border-slate-800 rounded-xl px-3 py-2.5 font-mono">
+                <p class="text-[9px] uppercase tracking-widest text-slate-500">Global Rounds</p>
+                <p id="stat-rounds" class="text-lg font-black text-white mt-0.5">--</p>
+            </div>
+            <div class="bg-slate-900/70 border border-slate-800 rounded-xl px-3 py-2.5 font-mono">
+                <p class="text-[9px] uppercase tracking-widest text-slate-500">Last Multiplier</p>
+                <p id="stat-last" class="text-lg font-black text-emerald-400 mt-0.5">--</p>
+            </div>
+            <div class="bg-slate-900/70 border border-slate-800 rounded-xl px-3 py-2.5 font-mono">
+                <p class="text-[9px] uppercase tracking-widest text-slate-500">Peak</p>
+                <p id="stat-peak" class="text-lg font-black text-orange-400 mt-0.5">--</p>
+            </div>
+            <div class="bg-slate-900/70 border border-slate-800 rounded-xl px-3 py-2.5 font-mono">
+                <p class="text-[9px] uppercase tracking-widest text-slate-500">Node</p>
+                <p class="text-lg font-black text-emerald-400 mt-0.5">ONLINE</p>
+            </div>
+        </div>
+
+        <!-- Shop Profile Card -->
+        <div id="shop-profile-card" class="mt-6 hidden bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-4 mb-4">
+                <div>
+                    <h2 class="font-mono font-bold text-xs text-emerald-400 uppercase tracking-widest mb-1">Shop Profile</h2>
+                    <p id="hub-shop-id" class="font-mono font-bold text-orange-400 break-all">--</p>
+                </div>
+                <button onclick="loadShopProfile()" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded font-mono text-xs font-semibold cursor-pointer transition-colors">🔄 Refresh</button>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                <div class="bg-slate-950 border border-slate-800 p-3 rounded-xl">
+                    <p class="text-[9px] font-mono uppercase text-slate-400 mb-1">Shop ID</p>
+                    <p id="hub-shop-id-val" class="font-mono font-bold text-emerald-400 break-all text-sm">--</p>
+                </div>
+                <div class="bg-slate-950 border border-slate-800 p-3 rounded-xl">
+                    <p class="text-[9px] font-mono uppercase text-slate-400 mb-1">Total Staff</p>
+                    <p id="hub-stat-staff" class="font-mono font-bold text-white text-sm">0</p>
+                </div>
+                <div class="bg-slate-950 border border-slate-800 p-3 rounded-xl">
+                    <p class="text-[9px] font-mono uppercase text-slate-400 mb-1">Tellers</p>
+                    <p id="hub-stat-tellers" class="font-mono font-bold text-blue-400 text-sm">0</p>
+                </div>
+                <div class="bg-slate-950 border border-slate-800 p-3 rounded-xl">
+                    <p class="text-[9px] font-mono uppercase text-slate-400 mb-1">Cashiers</p>
+                    <p id="hub-stat-cashiers" class="font-mono font-bold text-amber-400 text-sm">0</p>
+                </div>
+            </div>
+            <div class="overflow-hidden">
+                <table class="w-full text-left font-mono text-[10px]">
+                    <thead class="bg-slate-950/60 text-slate-500 uppercase text-[9px] border-b border-slate-800">
+                        <tr>
+                            <th class="px-3 sm:px-4 py-2">Name</th>
+                            <th class="px-3 sm:px-4 py-2">Phone</th>
+                            <th class="px-3 sm:px-4 py-2">Role</th>
+                            <th class="px-3 sm:px-4 py-2 text-right">Joined</th>
+                        </tr>
+                    </thead>
+                    <tbody id="hub-staff-body" class="divide-y divide-slate-800/60 text-slate-300">
+                        <!-- Populated via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Bottom action bar -->
+    <footer class="bg-slate-950/95 border-t border-slate-800 z-10">
+        <div class="max-w-7xl mx-auto flex items-stretch">
+            <a href="play.html" class="bottom-tab">GOBBLEGAME</a>
+            <a href="teller.html" class="bottom-tab">OPERATOR</a>
+            <a href="cashier.html" class="bottom-tab">CASHIER</a>
+            <a href="portal.html" class="bottom-tab hidden sm:block">BLUEPRINTS</a>
+            <a href="index.html" class="bottom-tab">HUB</a>
+        </div>
+    </footer>
+
+    <script>
+        const API_BASE = window.__API_BASE__ || (location.protocol === "file:" ? "http://localhost:8787" : "https://worker.bagsim.co.ke");
+        const WALLET_KEY = "demo_wallet_play";
+
+        // Clock
+        setInterval(() => {
+            document.getElementById("clock").innerText = new Date().toLocaleTimeString('en-US', {
+                hour12: false
+            });
+        }, 1000);
+
+        // Wallet mirror from localStorage
+        function refreshWalletChip() {
+            const raw = localStorage.getItem(WALLET_KEY);
+            const n = Number(raw);
+            const v = Number.isFinite(n) ? n : 10000;
+            document.getElementById("hub-wallet").innerText = v.toLocaleString('en-US', {
+                maximumFractionDigits: 0
+            });
+        }
+        refreshWalletChip();
+        setInterval(refreshWalletChip, 1500);
+
+        // Stats from history
+        async function loadStats() {
+            try {
+                const res = await fetch(`${API_BASE}/api/history?mode=global`);
+                const data = await res.json();
+                if (!Array.isArray(data)) return;
+                const rounds = data;
+                const total = rounds.length;
+                const last = rounds[0] ? Number(rounds[0].crash_multiplier) : null;
+                const peak = rounds.reduce((m, r) => Math.max(m, Number(r.crash_multiplier) || 0), 0);
+                document.getElementById("stat-rounds").innerText = total.toLocaleString();
+                document.getElementById("stat-last").innerText = last ? `${last.toFixed(2)}x` : '--';
+                document.getElementById("stat-peak").innerText = peak ? `${peak.toFixed(2)}x` : '--';
+            } catch (e) { }
+        }
+        loadStats();
+        setInterval(loadStats, 5000);
+
+        // ================================================================
+        //  AUTH + SHOP PROFILE (hub card)
+        // ================================================================
+        const TOKEN_KEY = 'bagsim_token';
+        const USER_KEY = 'bagsim_user';
+
+        function hubGetToken() { return localStorage.getItem(TOKEN_KEY); }
+        function hubGetUser() {
+            try { return JSON.parse(localStorage.getItem(USER_KEY) || 'null'); } catch { return null; }
+        }
+        function hubAuthHeaders() {
+            const t = hubGetToken();
+            return t ? { 'Authorization': `Bearer ${t}` } : {};
+        }
+
+        async function hubLogin(phone, password) {
+            const res = await fetch(`${API_BASE}/api/auth/login`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone, password })
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.error || 'Login failed');
+            localStorage.setItem(TOKEN_KEY, data.token);
+            localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+            return data.user;
+        }
+        async function hubRegister(phone, password, displayName, role) {
+            const res = await fetch(`${API_BASE}/api/auth/register`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone, password, display_name: displayName, role })
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.error || 'Registration failed');
+            localStorage.setItem(TOKEN_KEY, data.token);
+            localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+            return data.user;
+        }
+        async function hubVerify() {
+            if (!hubGetToken()) return null;
+            try {
+                const res = await fetch(`${API_BASE}/api/auth/me`, { headers: hubAuthHeaders() });
+                if (!res.ok) { hubLogout(); return null; }
+                const data = await res.json();
+                if (data.success) { localStorage.setItem(USER_KEY, JSON.stringify(data.user)); return data.user; }
+            } catch { }
+            return null;
+        }
+        function hubLogout() {
+            localStorage.removeItem(TOKEN_KEY);
+            localStorage.removeItem(USER_KEY);
+            location.reload();
+        }
+
+        async function loadShopProfile() {
+            const card = document.getElementById('shop-profile-card');
+            if (!card) return;
+            try {
+                const res = await fetch(`${API_BASE}/api/auth/shop-profile`, {
+                    headers: hubAuthHeaders(), cache: "no-store"
+                });
+                if (!res.ok) {
+                    if (res.status === 401) { hubLogout(); }
+                    card.classList.add('hidden');
+                    return;
+                }
+                const data = await res.json();
+                if (!data.success) { card.classList.add('hidden'); return; }
+
+                document.getElementById('hub-shop-id').innerText = data.shop_id;
+                document.getElementById('hub-shop-id-val').innerText = data.shop_id;
+                const workers = data.workers || [];
+                document.getElementById('hub-stat-staff').innerText = workers.length;
+                document.getElementById('hub-stat-tellers').innerText = workers.filter(w => w.role === 'teller').length;
+                document.getElementById('hub-stat-cashiers').innerText = workers.filter(w => w.role === 'cashier').length;
+
+                const tbody = document.getElementById('hub-staff-body');
+                tbody.innerHTML = '';
+                if (workers.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="4" class="text-center py-6 text-slate-500">No staff in this shop.</td></tr>`;
+                } else {
+                    workers.forEach(w => {
+                        const rc = w.role === 'teller' ? 'text-blue-400' : w.role === 'cashier' ? 'text-amber-400' : 'text-emerald-400';
+                        const joined = w.created_at ? new Date(w.created_at).toLocaleDateString() : '--';
+                        tbody.innerHTML += `<tr class="hover:bg-slate-900/80">
+                            <td class="px-3 sm:px-4 py-3">${w.display_name || 'Unnamed'}</td>
+                            <td class="px-3 sm:px-4 py-3 font-mono text-slate-300">${w.phone}</td>
+                            <td class="px-3 sm:px-4 py-3 font-bold ${rc} uppercase text-[9px]">${w.role}</td>
+                            <td class="px-3 sm:px-4 py-3 text-slate-500 text-[9px] text-right">${joined}</td>
+                        </tr>`;
+                    });
+                }
+                card.classList.remove('hidden');
+
+                // Show local + global display cards for authenticated users
+                const localCard = document.getElementById('hub-local-display-card');
+                const globalCard = document.getElementById('hub-global-display-card');
+                const localShopIdEl = document.getElementById('hub-local-shop-id');
+                if (localCard && globalCard) {
+                    globalCard.classList.remove('hidden');
+                    localCard.classList.remove('hidden');
+                    localCard.href = `display.html?local_id=${encodeURIComponent(data.shop_id || 'default')}`;
+                    globalCard.href = 'display.html?mode=global';
+                    if (localShopIdEl) localShopIdEl.innerText = `shop: ${data.shop_id || 'default'}`;
+                }
+            } catch (e) {
+                card.classList.add('hidden');
+            }
+        }
+
+        function openShopProfile() {
+            const card = document.getElementById('shop-profile-card');
+            if (!hubGetToken()) {
+                // Simple inline auth prompt
+                const phone = prompt('Enter phone number:');
+                if (!phone) return;
+                const password = prompt('Enter password:');
+                if (!password) return;
+                hubLogin(phone, password).then(() => loadShopProfile()).catch(e => alert(e.message || 'Login failed'));
+            } else {
+                loadShopProfile();
+            }
+        }
+
+        (async () => {
+            const user = await hubVerify();
+            if (user) loadShopProfile();
+        })();
+    </script>
+
+    <script>
+        // ================================================================
+        //  SOURCE PROTECTION
+        // ================================================================
+        (function(){
+            document.addEventListener('contextmenu', function(e){ e.preventDefault(); return false; }, false);
+            document.addEventListener('selectstart', function(e){ e.preventDefault(); return false; }, false);
+            document.addEventListener('dragstart', function(e){ e.preventDefault(); return false; }, false);
+            document.addEventListener('keydown', function(e){
+                if (e.key === 'F12') { e.preventDefault(); return false; }
+                if (e.ctrlKey && e.key === 'u') { e.preventDefault(); return false; }
+                if (e.ctrlKey && e.shiftKey && e.key === 'I') { e.preventDefault(); return false; }
+                if (e.ctrlKey && e.shiftKey && e.key === 'J') { e.preventDefault(); return false; }
+                if (e.ctrlKey && e.shiftKey && e.key === 'C') { e.preventDefault(); return false; }
+                if (e.ctrlKey && e.key === 's') { e.preventDefault(); return false; }
+                if (e.metaKey && e.key === 'u') { e.preventDefault(); return false; }
+                if (e.metaKey && e.shiftKey && e.key === 'I') { e.preventDefault(); return false; }
+                if (e.metaKey && e.shiftKey && e.key === 'J') { e.preventDefault(); return false; }
+                if (e.metaKey && e.shiftKey && e.key === 'C') { e.preventDefault(); return false; }
+            }, false);
+            var devtools = { open: false };
+            var threshold = 160;
+            setInterval(function(){
+                var w = window.outerWidth - window.innerWidth > threshold;
+                var h = window.outerHeight - window.innerHeight > threshold;
+                if (w || h) {
+                    if (!devtools.open) { devtools.open = true; window.location.href = 'about:blank'; }
+                } else { devtools.open = false; }
+            }, 500);
+        })();
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bag-Sim Shop Profile</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        .grid-bg {
+            background-image: linear-gradient(to right, rgba(16, 185, 129, 0.07) 1px, transparent 1px), linear-gradient(to bottom, rgba(16, 185, 129, 0.07) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans flex flex-col justify-between grid-bg select-none">
+
+    <!-- ================================================================ -->
+    <!--  AUTH GATE                                                       -->
+    <!-- ================================================================ -->
+    <div id="auth-gate" class="fixed inset-0 z-[100] bg-slate-950 grid-bg flex items-center justify-center p-4">
+        <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 sm:p-8 font-mono">
+
+            <div class="flex flex-col items-center mb-6">
+                <div class="flex flex-col items-center leading-none mb-3">
+                    <span class="text-[10px] font-black tracking-widest text-orange-500">THE BAG</span>
+                    <span class="text-lg font-black tracking-wider text-white">SIMULATOR</span>
+                </div>
+                <div id="auth-role-badge"
+                    class="bg-emerald-950/80 border border-emerald-800 px-3 py-1 rounded text-[10px] font-bold text-emerald-400 uppercase tracking-widest">
+                    STAFF ACCESS
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-1 mb-5 bg-slate-950 border border-slate-800 rounded-lg p-1">
+                <button id="tab-login" onclick="AuthUI.showLogin()"
+                    class="py-2 rounded text-xs font-bold uppercase tracking-widest bg-emerald-600 text-slate-950">
+                    Login
+                </button>
+                <button id="tab-register" onclick="AuthUI.showRegister()"
+                    class="py-2 rounded text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-white">
+                    Register
+                </button>
+            </div>
+
+            <form id="auth-form" onsubmit="AuthUI.submit(event)" class="space-y-3">
+                <div>
+                    <label class="text-[10px] uppercase tracking-widest text-slate-400 block mb-1">Phone Number</label>
+                    <input id="auth-phone" type="tel" required placeholder="07XX XXX XXX  ·  01XX XXX XXX  ·  +254..."
+                        autocomplete="username"
+                        class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-emerald-600" />
+                </div>
+
+                <div id="field-display-name" class="hidden">
+                    <label class="text-[10px] uppercase tracking-widest text-slate-400 block mb-1">Display Name <span
+                            class="text-slate-600">(optional)</span></label>
+                    <input id="auth-name" type="text" maxlength="40" placeholder="e.g. Jane W."
+                        class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-emerald-600" />
+                </div>
+
+                <div>
+                    <label class="text-[10px] uppercase tracking-widest text-slate-400 block mb-1">Password</label>
+                    <input id="auth-password" type="password" required minlength="6" maxlength="64"
+                        autocomplete="current-password" placeholder="••••••••"
+                        class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-emerald-600" />
+                </div>
+
+                <div id="auth-error" class="text-[11px] text-red-400 min-h-[16px]"></div>
+
+                <button id="auth-submit" type="submit"
+                    class="w-full bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black py-3 rounded-lg uppercase tracking-widest text-xs cursor-pointer transition-colors">
+                    Sign In
+                </button>
+            </form>
+
+            <p class="text-[10px] text-slate-500 text-center mt-5 leading-relaxed">
+                Authorized staff only. Sessions expire after 30 days.<br> Contact your shop admin if you've lost access.
+            </p>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header
+        class="flex flex-col sm:flex-row justify-between items-center px-4 sm:px-6 py-3 bg-slate-900 border-b border-slate-800 z-10 gap-2">
+        <div class="flex items-center space-x-3">
+            <span class="bg-emerald-600 text-white font-black px-3 py-1 rounded text-[10px] tracking-wider uppercase font-mono">SHOP
+                PROFILE</span>
+            <span class="text-slate-100 font-mono font-bold text-xs tracking-wider">STAFF DIRECTORY</span>
+        </div>
+        <div class="flex items-center space-x-4">
+            <div id="user-chip"
+                class="hidden items-center gap-2 bg-slate-950 border border-slate-700 rounded px-2.5 py-1 font-mono text-[11px]">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                <span id="user-chip-role" class="text-emerald-400 font-bold uppercase">STAFF</span>
+                <span id="user-chip-phone" class="text-slate-400">--</span>
+                <button onclick="AuthUI.logout()" class="text-slate-500 hover:text-red-400 ml-1 cursor-pointer"
+                    title="Sign out">⏻</button>
+            </div>
+            <div id="clock" class="font-mono text-xs text-slate-400">--:--:--</div>
+            <a href="teller.html" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1 rounded text-xs font-mono font-bold text-slate-400 cursor-pointer transition-colors">
+                → Teller Terminal
+            </a>
+        </div>
+    </header>
+
+    <!-- Shop Profile Card -->
+    <main class="flex-1 p-3 sm:p-6 max-w-4xl w-full mx-auto z-10">
+        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-4 mb-6">
+                <div>
+                    <h2 class="font-mono font-bold text-xs text-emerald-400 uppercase tracking-widest mb-1">Shop
+                        Profile</h2>
+                    <p id="shop-id-display" class="text-lg font-mono font-bold text-orange-400 break-all">--</p>
+                </div>
+                <button onclick="loadShopProfile()" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded font-mono text-xs font-semibold cursor-pointer transition-colors">🔄
+                    Refresh</button>
+            </div>
+
+            <!-- Shop Info -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div class="bg-slate-950 border border-slate-800 p-4 rounded-xl">
+                    <p class="text-[10px] font-mono uppercase text-slate-400 mb-1">Shop ID</p>
+                    <p id="stat-shop-id" class="font-mono font-bold text-emerald-400 break-all">--</p>
+                </div>
+                <div class="bg-slate-950 border border-slate-800 p-4 rounded-xl">
+                    <p class="text-[10px] font-mono uppercase text-slate-400 mb-1">Total Staff</p>
+                    <p id="stat-total-staff" class="font-mono font-bold text-white">0</p>
+                </div>
+                <div class="bg-slate-950 border border-slate-800 p-4 rounded-xl">
+                    <p class="text-[10px] font-mono uppercase text-slate-400 mb-1">Tellers</p>
+                    <p id="stat-tellers" class="font-mono font-bold text-blue-400">0</p>
+                </div>
+                <div class="bg-slate-950 border border-slate-800 p-4 rounded-xl">
+                    <p class="text-[10px] font-mono uppercase text-slate-400 mb-1">Cashiers</p>
+                    <p id="stat-cashiers" class="font-mono font-bold text-amber-400">0</p>
+                </div>
+            </div>
+
+            <!-- Staff Table -->
+            <div class="overflow-hidden">
+                <table class="w-full text-left font-mono text-xs">
+                    <thead class="bg-slate-950/60 text-slate-500 uppercase text-[10px] border-b border-slate-800">
+                        <tr>
+                            <th class="px-4 sm:px-6 py-3">Name</th>
+                            <th class="px-4 sm:px-6 py-3">Phone</th>
+                            <th class="px-4 sm:px-6 py-3">Role</th>
+                            <th class="px-4 sm:px-6 py-3">Shop ID</th>
+                            <th class="px-4 sm:px-6 py-3 text-right">Joined</th>
+                        </tr>
+                    </thead>
+                    <tbody id="staff-table-body" class="divide-y divide-slate-800/60 text-slate-300">
+                        <!-- Populated dynamically via JS -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-4 pt-4 border-t border-slate-800 text-center">
+                <p class="text-[10px] text-slate-500 uppercase tracking-widest">
+                    Share this Shop ID with your team so they join the same lounge: <span id="share-shop-id" class="font-bold text-orange-400">--</span>
+                </p>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // ================================================================
+        //  CONFIG
+        // ================================================================
+        const API_BASE = window.__API_BASE__ || (location.protocol === "file:" ? "http://localhost:8787" : "https://worker.bagsim.co.ke");
+        const TOKEN_KEY = 'bagsim_token';
+        const USER_KEY = 'bagsim_user';
+
+        // ================================================================
+        //  AUTH CLIENT
+        // ================================================================
+        const Auth = {
+            getToken() {
+                return localStorage.getItem(TOKEN_KEY);
+            },
+            getUser() {
+                try {
+                    return JSON.parse(localStorage.getItem(USER_KEY) || 'null');
+                } catch {
+                    return null;
+                }
+            },
+            setSession(token, user) {
+                localStorage.setItem(TOKEN_KEY, token);
+                localStorage.setItem(USER_KEY, JSON.stringify(user));
+            },
+            clearSession() {
+                localStorage.removeItem(TOKEN_KEY);
+                localStorage.removeItem(USER_KEY);
+            },
+            authHeaders() {
+                const t = this.getToken();
+                return t ? {
+                    'Authorization': `Bearer ${t}`
+                } : {};
+            },
+            async login(phone, password) {
+                const res = await fetch(`${API_BASE}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        phone,
+                        password
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || 'Login failed');
+                this.setSession(data.token, data.user);
+                return data.user;
+            },
+            async register(phone, password, displayName, role) {
+                const res = await fetch(`${API_BASE}/api/auth/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        phone,
+                        password,
+                        display_name: displayName,
+                        role
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || 'Registration failed');
+                this.setSession(data.token, data.user);
+                return data.user;
+            },
+            async logout() {
+                try {
+                    await fetch(`${API_BASE}/api/auth/logout`, {
+                        method: 'POST',
+                        headers: Object.assign({
+                            'Content-Type': 'application/json'
+                        }, this.authHeaders())
+                    });
+                } catch { }
+                this.clearSession();
+            },
+            async verify() {
+                if (!this.getToken()) return null;
+                try {
+                    const res = await fetch(`${API_BASE}/api/auth/me`, {
+                        headers: this.authHeaders()
+                    });
+                    if (!res.ok) {
+                        this.clearSession();
+                        return null;
+                    }
+                    const data = await res.json();
+                    if (data.success) {
+                        localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+                        return data.user;
+                    }
+                } catch { }
+                return null;
+            }
+        };
+
+        // ================================================================
+        //  AUTH UI CONTROLLER
+        // ================================================================
+        const AuthUI = {
+            mode: 'login',
+            pageRole: 'staff',
+
+            showLogin() {
+                this.mode = 'login';
+                document.getElementById('tab-login').className = 'py-2 rounded text-xs font-bold uppercase tracking-widest bg-emerald-600 text-slate-950';
+                document.getElementById('tab-register').className = 'py-2 rounded text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-white';
+                document.getElementById('field-display-name').classList.add('hidden');
+                document.getElementById('auth-submit').innerText = 'Sign In';
+                document.getElementById('auth-error').innerText = '';
+                document.getElementById('auth-password').setAttribute('autocomplete', 'current-password');
+            },
+
+            showRegister() {
+                this.mode = 'register';
+                document.getElementById('tab-register').className = 'py-2 rounded text-xs font-bold uppercase tracking-widest bg-emerald-600 text-slate-950';
+                document.getElementById('tab-login').className = 'py-2 rounded text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-white';
+                document.getElementById('field-display-name').classList.remove('hidden');
+                document.getElementById('auth-submit').innerText = 'Create Account';
+                document.getElementById('auth-error').innerText = '';
+                document.getElementById('auth-password').setAttribute('autocomplete', 'new-password');
+            },
+
+            async submit(ev) {
+                ev.preventDefault();
+                const phone = document.getElementById('auth-phone').value.trim();
+                const password = document.getElementById('auth-password').value;
+                const displayName = document.getElementById('auth-name').value.trim();
+                const errEl = document.getElementById('auth-error');
+                const btn = document.getElementById('auth-submit');
+
+                errEl.innerText = '';
+                btn.disabled = true;
+                const original = btn.innerText;
+                btn.innerText = 'Please wait…';
+
+                try {
+                    let user;
+                    if (this.mode === 'login') {
+                        user = await Auth.login(phone, password);
+                    } else {
+                        user = await Auth.register(phone, password, displayName, this.pageRole);
+                    }
+                    this.onAuthenticated(user);
+                } catch (err) {
+                    errEl.innerText = err.message || 'Authentication failed.';
+                    btn.disabled = false;
+                    btn.innerText = original;
+                }
+            },
+
+            onAuthenticated(user) {
+                document.getElementById('auth-gate').classList.add('hidden');
+                const chip = document.getElementById('user-chip');
+                chip.classList.remove('hidden');
+                chip.classList.add('flex');
+                document.getElementById('user-chip-role').innerText = (user.role || this.pageRole).toUpperCase();
+                document.getElementById('user-chip-phone').innerText = user.phone || '';
+                if (typeof onAuthReady === 'function') onAuthReady(user);
+            },
+
+            async logout() {
+                if (!confirm('Sign out of this terminal?')) return;
+                await Auth.logout();
+                location.reload();
+            }
+        };
+
+        // ================================================================
+        //  SHOP PROFILE
+        // ================================================================
+        let currentUser = null;
+
+        async function loadShopProfile() {
+            try {
+                const res = await fetch(`${API_BASE}/api/auth/shop-profile`, {
+                    headers: Auth.authHeaders(),
+                    cache: "no-store"
+                });
+                const data = await res.json();
+
+                if (!res.ok || !data.success) {
+                    if (res.status === 401) {
+                        Auth.clearSession();
+                        setTimeout(() => location.reload(), 800);
+                    }
+                    return;
+                }
+
+                document.getElementById("shop-id-display").innerText = data.shop_id;
+                document.getElementById("stat-shop-id").innerText = data.shop_id;
+                document.getElementById("share-shop-id").innerText = data.shop_id;
+
+                const workers = data.workers || [];
+                document.getElementById("stat-total-staff").innerText = workers.length;
+                document.getElementById("stat-tellers").innerText = workers.filter(w => w.role === 'teller').length;
+                document.getElementById("stat-cashiers").innerText = workers.filter(w => w.role === 'cashier').length;
+
+                const tbody = document.getElementById("staff-table-body");
+                tbody.innerHTML = "";
+
+                if (workers.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-slate-500">No staff found in this shop.</td></tr>`;
+                    return;
+                }
+
+                workers.forEach(w => {
+                    const roleColor = w.role === 'teller' ? "text-blue-400" : w.role === 'cashier' ? "text-amber-400" : "text-emerald-400";
+                    const joined = w.created_at ? new Date(w.created_at).toLocaleDateString() : '--';
+                    const tr = document.createElement("tr");
+                    tr.className = "hover:bg-slate-900/80 transition-colors";
+                    tr.innerHTML = `
+                        <td class="px-4 sm:px-6 py-4">${w.display_name || 'Unnamed'}</td>
+                        <td class="px-4 sm:px-6 py-4 font-mono text-slate-300">${w.phone}</td>
+                        <td class="px-4 sm:px-6 py-4 font-bold ${roleColor} uppercase text-[10px]">${w.role}</td>
+                        <td class="px-4 sm:px-6 py-4 font-mono text-emerald-400 text-[10px] break-all">${w.shop_id || 'default'}</td>
+                        <td class="px-4 sm:px-6 py-4 text-slate-500 text-[10px] text-right">${joined}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+            } catch (err) {
+                console.error("Failed to load shop profile:", err);
+            }
+        }
+
+        setInterval(() => {
+            document.getElementById("clock").innerText = new Date().toLocaleTimeString('en-US', {
+                hour12: false
+            });
+        }, 1000);
+
+        // ================================================================
+        //  BOOT — gated behind auth
+        // ================================================================
+        let bootStarted = false;
+
+        function bootApp() {
+            if (bootStarted) return;
+            bootStarted = true;
+            loadShopProfile();
+        }
+
+        function onAuthReady() {
+            bootApp();
+        }
+
+        (async () => {
+            AuthUI.showLogin();
+            const user = await Auth.verify();
+            if (user) AuthUI.onAuthenticated(user);
+        })();
+    </script>
+
+    <script>
+        // ================================================================
+        //  SOURCE PROTECTION
+        // ================================================================
+        (function(){
+            document.addEventListener('contextmenu', function(e){ e.preventDefault(); return false; }, false);
+            document.addEventListener('selectstart', function(e){ e.preventDefault(); return false; }, false);
+            document.addEventListener('dragstart', function(e){ e.preventDefault(); return false; }, false);
+            document.addEventListener('keydown', function(e){
+                if (e.key === 'F12') { e.preventDefault(); return false; }
+                if (e.ctrlKey && e.key === 'u') { e.preventDefault(); return false; }
+                if (e.ctrlKey && e.shiftKey && e.key === 'I') { e.preventDefault(); return false; }
+                if (e.ctrlKey && e.shiftKey && e.key === 'J') { e.preventDefault(); return false; }
+                if (e.ctrlKey && e.shiftKey && e.key === 'C') { e.preventDefault(); return false; }
+                if (e.ctrlKey && e.key === 's') { e.preventDefault(); return false; }
+                if (e.metaKey && e.key === 'u') { e.preventDefault(); return false; }
+                if (e.metaKey && e.shiftKey && e.key === 'I') { e.preventDefault(); return false; }
+                if (e.metaKey && e.shiftKey && e.key === 'J') { e.preventDefault(); return false; }
+                if (e.metaKey && e.shiftKey && e.key === 'C') { e.preventDefault(); return false; }
+            }, false);
+            var devtools = { open: false };
+            var threshold = 160;
+            setInterval(function(){
+                var w = window.outerWidth - window.innerWidth > threshold;
+                var h = window.outerHeight - window.innerHeight > threshold;
+                if (w || h) {
+                    if (!devtools.open) { devtools.open = true; window.location.href = 'about:blank'; }
+                } else { devtools.open = false; }
+            }, 500);
+        })();
+    </script>
+</body>
+
+</html>
