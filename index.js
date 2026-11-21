@@ -516,6 +516,13 @@ export default {
                     return Response.json({ error: 'Global round not found' }, { status: 404, headers: corsHeaders });
                 }
 
+                // Only allow bets during countdown phase
+                const timing = computeRoundTiming(round);
+                const now = Date.now();
+                if (now >= timing.climbStartAt) {
+                    return Response.json({ error: 'Betting closed — round already in progress' }, { status: 403, headers: corsHeaders });
+                }
+
                 const ticketCode = `TKT-${Math.floor(1000 + Math.random() * 9000)}`;
 
                 try {
