@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Play Demo — Bag sim Terminal</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        .grid-bg {
+            background-image: linear-gradient(to right, rgba(16, 185, 129, 0.07) 1px, transparent 1px), linear-gradient(to bottom, rgba(16, 185, 129, 0.07) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+        
+        .glow-green {
+            text-shadow: 0 0 20px rgba(16, 185, 129, 0.4), 0 0 40px rgba(16, 185, 129, 0.15);
+        }
+        
+        .glow-red {
+            text-shadow: 0 0 20px rgba(239, 68, 68, 0.4), 0 0 40px rgba(239, 68, 68, 0.15);
+        }
+        
+        .glow-blue {
+            text-shadow: 0 0 20px rgba(59, 130, 246, 0.4), 0 0 40px rgba(59, 130, 246, 0.15);
+        }
+        
+        .chip-active {
+            background-color: rgb(16 185 129) !important;
+            color: rgb(2 6 23) !important;
+            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.5), 0 0 20px rgba(16, 185, 129, 0.35);
+        }
+        
+        .chip-active-orange {
+            background-color: rgb(249 115 22) !important;
+            color: rgb(2 6 23) !important;
+            box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.5), 0 0 20px rgba(249, 115, 22, 0.35);
+        }
+        
+        .cash-chip {
+            transition: transform 0.08s ease, background-color 0.12s ease;
+        }
+        
+        .cash-chip:active:not(:disabled) {
+            transform: scale(0.94);
+        }
+        
+        .cash-chip:not(:disabled) {
+            background-color: rgb(194 65 12) !important;
+            color: rgb(2 6 23) !important;
+            border-color: rgb(249 115 22) !important;
+            font-weight: 900;
+        }
+        
+        @media (max-width: 1023px) {
+            .console-pane {
+                display: none;
+            }
+            .console-pane.active {
+                display: block;
+            }
+        }
+        
+        .live-return-btn {
+            cursor: pointer;
+            transition: transform 0.08s ease, background-color 0.15s ease, border-color 0.15s ease;
+        }
+        
+        .live-return-btn:active {
+            transform: scale(0.98);
+        }
+        
+        .live-return-btn.armed {
+            background-color: rgb(6 78 59) !important;
+            border-color: rgb(16 185 129) !important;
+            animation: pulse-green 1.2s ease-in-out infinite;
+        }
+        
+        @keyframes pulse-green {
+            0%,
+            100% {
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.45);
+            }
+            50% {
+                box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans flex flex-col justify-between grid-bg select-none">
+
+    <!-- Header -->
+    <header class="flex flex-col sm:flex-row justify-between items-center px-3 sm:px-6 py-3 bg-slate-900 border-b border-slate-800 z-10 gap-2">
+        <div class="flex items-center space-x-3">
+            <span class="text-emerald-400 font-mono font-bold text-[11px] sm:text-xs tracking-wider text-center sm:text-left">
+                BAG SIMULATOR
+            </span>
+        </div>
+        <div class="flex items-center gap-2 sm:gap-4">
+            <div id="clock" class="font-mono text-[11px] sm:text-xs text-slate-400">--:--:--</div>
+            <button onclick="toggleGlobalMode()" id="mode-badge" class="bg-emerald-950/80 border border-emerald-800 px-3 py-1 rounded text-[10px] sm:text-xs font-mono font-bold text-emerald-400 cursor-pointer hover:bg-emerald-900 transition-colors">
+                [ GLOBAL ]
+            </button>
+        </div>
+    </header>
+
+    <!-- Wallet Ribbon -->
+    <section class="w-full bg-slate-900/70 border-b border-slate-800 px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-2 z-10 font-mono">
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+            <div class="flex items-center gap-2">
+                <span class="text-slate-500 uppercase text-[10px] tracking-wider">Wallet</span>
+                <span id="wallet-balance" class="text-emerald-400 font-black text-sm">KES 10,000.00</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="text-slate-500 uppercase text-[10px] tracking-wider">Live</span>
+                <span id="live-multiplier" class="text-emerald-400 font-black text-sm">1.00x</span>
+            </div>
+        </div>
+        <button onclick="resetWallet()" class="bg-red-950/60 hover:bg-red-900 border border-red-900 px-2.5 py-1 rounded font-mono text-[10px] font-bold text-red-400 transition-colors cursor-pointer">
+            ↺ RESET 10K
+        </button>
+    </section>
+
+    <!-- Mobile console tab switcher -->
+    <div class="lg:hidden w-full bg-slate-900/60 border-b border-slate-800 px-3 py-2 z-10">
+        <div class="bg-slate-950 border border-slate-800 p-1 rounded-lg grid grid-cols-2 gap-1 font-mono text-xs">
+            <button id="mob-tab-B" onclick="switchMobileConsole('B')" class="py-2 rounded font-bold bg-orange-600 text-slate-950">CONSOLE B</button>
+            <button id="mob-tab-A" onclick="switchMobileConsole('A')" class="py-2 rounded font-bold text-slate-400">CONSOLE A</button>
+        </div>
+    </div>
+
+    <div id="local-lock-banner" class="hidden w-full bg-amber-950/40 border-b border-amber-900 px-3 py-2 text-center font-mono text-[11px] text-amber-400">
+        LOCAL rounds are settled at a physical shop — switch to GLOBAL to play.
+    </div>
+
+    <!-- Main Workbench -->
+    <main class="flex-1 p-2 sm:p-5 grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4 max-w-7xl w-full mx-auto z-10">
+
+        <!-- Live Monitor -->
+        <div class="order-1 lg:order-2 lg:col-span-4 bg-slate-900/90 border border-slate-800 rounded-2xl p-3 sm:p-5 shadow-2xl flex flex-col justify-between space-y-3 sm:space-y-4">
+            <div>
+                <h2 class="text-center font-mono font-bold text-xs text-orange-400 uppercase tracking-widest border-b border-slate-800 pb-2 mb-3">
+                    LIVE ROUND MONITOR
+                </h2>
+
+                <div class="w-full bg-slate-950 border border-emerald-900/60 rounded-xl p-4 sm:p-5 text-center relative overflow-hidden">
+                    <div class="text-4xl sm:text-5xl font-black font-mono text-emerald-400 glow-green" id="mini-multiplier">1.00x</div>
+                    <div id="mini-status" class="text-[10px] font-mono text-slate-400 uppercase mt-2">SYNCING TERMINAL...
+                    </div>
+                    <div id="mini-round-id" class="text-[10px] font-mono text-slate-600 mt-0.5">Round #---</div>
+                </div>
+
+                <div class="mt-4">
+                    <div class="text-[10px] font-mono uppercase text-slate-400 mb-1">Recent Crashes — tap to verify
+                    </div>
+                    <div id="recent-crashes" class="flex gap-1.5 overflow-x-auto pb-1 text-xs font-mono">
+                        <span class="text-slate-600 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-1.5">
+                <div class="flex justify-between font-mono text-[11px] text-slate-400 py-1 border-b border-slate-800">
+                    <span>Phase</span>
+                    <span id="phase-label" class="text-white font-bold uppercase">—</span>
+                </div>
+                <div class="flex justify-between font-mono text-[11px] text-slate-400 py-1 border-b border-slate-800">
+                    <span>Bets Lock</span>
+                    <span id="lock-label" class="text-blue-400 font-bold">--</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Console A -->
+        <div id="pane-A" class="console-pane order-2 lg:order-1 lg:col-span-4 lg:!block bg-slate-900/90 border border-slate-800 rounded-2xl p-3 sm:p-5 shadow-2xl flex flex-col justify-between space-y-3 sm:space-y-4 relative overflow-hidden">
+            <div class="absolute top-0 left-0 right-0 h-0.5 bg-emerald-600/60"></div>
+            <div>
+                <h2 class="text-center font-mono font-bold text-xs text-emerald-400 uppercase tracking-widest border-b border-slate-800 pb-2 mb-3">
+                    CONSOLE A
+                </h2>
+                <div class="space-y-2 mb-4">
+                    <div class="flex items-center justify-between">
+                        <label class="text-[10px] font-mono uppercase text-slate-400">Amount (KES)</label>
+                        <span class="text-[10px] font-mono text-slate-500">±10 per tap</span>
+                    </div>
+                    <div class="flex items-stretch gap-1.5">
+                        <button onclick="nudgeStake('A', -10)" class="w-12 sm:w-10 h-12 sm:h-auto bg-slate-800 hover:bg-slate-700 active:bg-slate-600 border border-slate-700 rounded-lg font-mono font-black text-xl">−</button>
+                        <input id="stake-A" type="text" inputmode="numeric" value="0" class="flex-1 min-w-0 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 font-mono text-lg font-bold text-emerald-400 text-center focus:outline-none focus:border-emerald-600">
+                        <button onclick="nudgeStake('A', 10)" class="w-12 sm:w-10 h-12 sm:h-auto bg-slate-800 hover:bg-slate-700 active:bg-slate-600 border border-slate-700 rounded-lg font-mono font-black text-xl">+</button>
+                    </div>
+                    <div class="grid grid-cols-3 gap-1">
+                        <button data-stake-chip="A" data-value="100" onclick="pickStake('A',100)" class="stake-chip bg-slate-800 hover:bg-emerald-900/60 border border-slate-700 py-2.5 rounded font-mono text-xs font-bold">100</button>
+                        <button data-stake-chip="A" data-value="200" onclick="pickStake('A',200)" class="stake-chip bg-slate-800 hover:bg-emerald-900/60 border border-slate-700 py-2.5 rounded font-mono text-xs font-bold">200</button>
+                        <button data-stake-chip="A" data-value="500" onclick="pickStake('A',500)" class="stake-chip bg-slate-800 hover:bg-emerald-900/60 border border-slate-700 py-2.5 rounded font-mono text-xs font-bold">500</button>
+                        <button data-stake-chip="A" data-value="1000" onclick="pickStake('A',1000)" class="stake-chip bg-slate-800 hover:bg-emerald-900/60 border border-slate-700 py-2.5 rounded font-mono text-xs font-bold">1000</button>
+                        <button data-stake-chip="A" data-value="5000" onclick="pickStake('A',5000)" class="stake-chip bg-slate-800 hover:bg-emerald-900/60 border border-slate-700 py-2.5 rounded font-mono text-xs font-bold">5000</button>
+                        <button data-stake-chip="A" data-value="10000" onclick="pickStake('A',10000)" class="stake-chip bg-slate-800 hover:bg-emerald-900/60 border border-slate-700 py-2.5 rounded font-mono text-xs font-bold">10000</button>
+                    </div>
+                    <div class="flex items-center justify-between mt-2">
+                        <label class="text-[10px] font-mono uppercase text-slate-400">Exit Multiplier (Global)</label>
+                        <input id="exit-A" type="text" inputmode="numeric" value="2.00" class="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 font-mono text-lg font-bold text-orange-400 text-center w-20">
+                    </div>
+                </div>
+                <button id="place-A" onclick="placeOrCancel('A')" class="w-full bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-400 text-slate-950 font-mono font-extrabold py-3 rounded-xl uppercase tracking-wider cursor-pointer transition-colors">
+                    PLACE BET
+                </button>
+            </div>
+            <div class="space-y-2 mt-3">
+                <div id="slip-status-A" class="text-center font-mono text-[11px] text-slate-500 bg-slate-950 border border-slate-800 rounded-lg py-2 px-2 min-h-[34px] flex items-center justify-center">
+                    IDLE — set stake & tap PLACE BET
+                </div>
+                <div id="live-return-A" class="hidden live-return-btn bg-slate-950 border border-emerald-900/60 rounded-xl px-3 py-3 text-center" onclick="fullCashout('A')" title="Tap to cash out 100%">
+                    <div class="text-[10px] font-mono text-slate-500 uppercase tracking-wider">Live Returns — Tap to Cash Out 100%</div>
+                    <div class="text-2xl font-black font-mono text-emerald-400" id="live-return-amount-A">KES 0.00</div>
+                    <div class="text-[10px] font-mono text-slate-500 mt-0.5">
+                        Riding: KES <span id="riding-amount-A">0.00</span> · Banked: KES <span id="banked-amount-A">0.00</span>
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-1">
+                    <button data-cash-chip="A" data-pct="5" onclick="partialCashout('A', 5)" class="cash-chip bg-slate-800 border border-slate-700 py-2.5 rounded font-mono text-xs font-bold text-slate-400 cursor-not-allowed" disabled>5%</button>
+                    <button data-cash-chip="A" data-pct="10" onclick="partialCashout('A', 10)" class="cash-chip bg-slate-800 border border-slate-700 py-2.5 rounded font-mono text-xs font-bold text-slate-400 cursor-not-allowed" disabled>10%</button>
+                    <button data-cash-chip="A" data-pct="25" onclick="partialCashout('A', 25)" class="cash-chip bg-slate-800 border border-slate-700 py-2.5 rounded font-mono text-xs font-bold text-slate-400 cursor-not-allowed" disabled>25%</button>
+                    <button data-cash-chip="A" data-pct="50" onclick="partialCashout('A', 50)" class="cash-chip bg-slate-800 border border-slate-700 py-2.5 rounded font-mono text-xs font-bold text-slate-400 cursor-not-allowed" disabled>50%</button>
+                    <button data-cash-chip="A" data-pct="75" onclick="partialCashout('A', 75)" class="cash-chip bg-slate-800 border border-slate-700 py-2.5 rounded font-mono text-xs font-bold text-slate-400 cursor-not-allowed" disabled>75%</button>
+                    <button data-cash-chip="A" data-pct="100" onclick="partialCashout('A', 100)" class="cash-chip bg-slate-800 border border-slate-700 py-2.5 rounded font-mono text-xs font-bold text-slate-400 cursor-not-allowed" disabled>100%</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Console B -->
+        <div id="pane-B" class="console-pane active order-3 lg:order-3 lg:col-span-4 lg:!block bg-slate-900/90 border border-slate-800 rounded-2xl p-3 sm:p-5 shadow-2xl flex flex-col justify-between space-y-3 sm:space-y-4 relative overflow-hidden">
+            <div class="absolute top-0 left-0 right-0 h-0.5 bg-orange-600/60"></div>
+            <div>
+                <h2 class="text-center font-mono font-bold text-xs text-orange-400 uppercase tracking-widest border-b border-slate-800 pb-2 mb-3">
+                    CONSOLE B
+                </h2>
+                <div class="space-y-2 mb-4">
+                    <div class="flex items-center justify-between">
+                        <label class="text-[10px] font-mono uppercase text-slate-400">Amount (KES)</label>
+                        <span class="text-[10px] font-mono text-slate-500">±10 per tap</span>
+                    </div>
+                    <div class="flex items-stretch gap-1.5">
+                        <button onclick="nudgeStake('B', -10)" class="w-12 sm:w-10 h-12 sm:h-auto bg-slate-800 hover:bg-slate-700 active:bg-slate-600 border border-slate-700 rounded-lg font-mono font-black text-xl">−</button>
+                        <input id="stake-B" type="text" inputmode="numeric" value="0" class="flex-1 min-w-0 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 font-mono text-lg font-bold text-orange-400 text-center focus:outline-none focus:border-orange-600">
+                        <button onclick="nudgeStake('B', 10)" class="w-12 sm:w-10 h-12 sm:h-auto bg-slate-800 hover:bg-slate-700 active:bg-slate-600 border border-slate-700 rounded-lg font-mono font-black text-xl">+</button>
+                    </div>
+                    <div class="grid grid-cols-3 gap-1">
+                        <button data-stake-chip="B" data-value="100" onclick="pickStake('B',100)" class="stake-chip bg-slate-800 hover:bg-orange-900/60 border border-slate-700 py-2.5 rounded font-mono text-xs font-bold">100</button>
+                        <button data-stake-chip="B" data-value="200" onclick="pickStake('B',200)" class="stake-chip bg-slate-800 hover:bg-orange-900/60 border border-slate-700 py-2.5 rounded font-mono text-xs font-bold">200</button>
+                        <button data-stake-chip="B" data-value="500" onclick="pickStake('B',500)" class="stake-chip bg-slate-800 hover:bg-orange-900/60 border border-slate-700 py-2.5 rounded font-mono text-xs font-bold">500</button>
+                        <button data-stake-chip="B" data-value="1000" onclick="pickStake('B',1000)" class="stake-chip bg-slate-800 hover:bg-orange-900/60 border border-slate-700 py-2.5 rounded font-mono text-xs font-bold">1000</button>
+                        <button data-stake-chip="B" data-value="5000" onclick="pickStake('B',5000)" class="stake-chip bg-slate-800 hover:bg-orange-900/60 border border-slate-700 py-2.5 rounded font-mono text-xs font-bold">5000</button>
+                        <button data-stake-chip="B" data-value="10000" onclick="pickStake('B',10000)" class="stake-chip bg-slate-800 hover:bg-orange-900/60 border border-slate-700 py-2.5 rounded font-mono text-xs font-bold">10000</button>
+                    </div>
+                    <div class="flex items-center justify-between mt-2">
+                        <label class="text-[10px] font-mono uppercase text-slate-400">Exit Multiplier (Global)</label>
+                        <input id="exit-B" type="text" inputmode="numeric" value="2.00" class="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 font-mono text-lg font-bold text-orange-400 text-center w-20">
+                    </div>
+                </div>
+                <button id="place-B" onclick="placeOrCancel('B')" class="w-full bg-orange-600 hover:bg-orange-500 active:bg-orange-400 text-slate-950 font-mono font-extrabold py-3 rounded-xl uppercase tracking-wider cursor-pointer transition-colors">
+                    PLACE BET
+                </button>
+            </div>
+            <div class="space-y-2 mt-3">
+                <div id="slip-status-B" class="text-center font-mono text-[11px] text-slate-500 bg-slate-950 border border-slate-800 rounded-lg py-2 px-2 min-h-[34px] flex items-center justify-center">
+                    IDLE — set stake & tap PLACE BET
+                </div>
+                <div id="live-return-B" class="hidden live-return-btn bg-slate-950 border border-orange-900/60 rounded-xl px-3 py-3 text-center" onclick="fullCashout('B')" title="Tap to cash out 100%">
+                    <div class="text-[10px] font-mono text-slate-500 uppercase tracking-wider">Live Returns — Tap to Cash Out 100%</div>
+                    <div class="text-2xl font-black font-mono text-orange-400" id="live-return-amount-B">KES 0.00</div>
+                    <div class="text-[10px] font-mono text-slate-500 mt-0.5">
+                        Riding: KES <span id="riding-amount-B">0.00</span> · Banked: KES <span id="banked-amount-B">0.00</span>
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-1">
+                    <button data-cash-chip="B" data-pct="5" onclick="partialCashout('B', 5)" class="cash-chip bg-slate-800 border border-slate-700 py-2.5 rounded font-mono text-xs font-bold text-slate-400 cursor-not-allowed" disabled>5%</button>
+                    <button data-cash-chip="B" data-pct="10" onclick="partialCashout('B', 10)" class="cash-chip bg-slate-800 border border-slate-700 py-2.5 rounded font-mono text-xs font-bold text-slate-400 cursor-not-allowed" disabled>10%</button>
+                    <button data-cash-chip="B" data-pct="25" onclick="partialCashout('B', 25)" class="cash-chip bg-slate-800 border border-slate-700 py-2.5 rounded font-mono text-xs font-bold text-slate-400 cursor-not-allowed" disabled>25%</button>
+                    <button data-cash-chip="B" data-pct="50" onclick="partialCashout('B', 50)" class="cash-chip bg-slate-800 border border-slate-700 py-2.5 rounded font-mono text-xs font-bold text-slate-400 cursor-not-allowed" disabled>50%</button>
+                    <button data-cash-chip="B" data-pct="75" onclick="partialCashout('B', 75)" class="cash-chip bg-slate-800 border border-slate-700 py-2.5 rounded font-mono text-xs font-bold text-slate-400 cursor-not-allowed" disabled>75%</button>
+                    <button data-cash-chip="B" data-pct="100" onclick="partialCashout('B', 100)" class="cash-chip bg-slate-800 border border-slate-700 py-2.5 rounded font-mono text-xs font-bold text-slate-400 cursor-not-allowed" disabled>100%</button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="bg-slate-900/90 border-t border-slate-800 px-3 sm:px-6 py-2 flex items-center gap-3 overflow-x-auto z-10">
+        <span class="text-[10px] font-mono text-slate-500 uppercase tracking-widest whitespace-nowrap">Rounds:</span>
+        <div id="history-ticker" class="flex items-center gap-2 overflow-x-auto pb-0.5"></div>
+    </footer>
+
+    <!-- Provably Fair Modal -->
+    <div id="pf-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-slate-900 border border-slate-700 w-full max-w-xl rounded-2xl p-6 shadow-2xl space-y-4 font-mono max-h-[92vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="text-sm font-bold text-emerald-400 flex items-center gap-2">
+                    🛡️ Provably Fair Verification <span id="modal-round-id" class="text-slate-400"></span>
+                </h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-white font-bold text-xl px-2">&times;</button>
+            </div>
+            <div class="space-y-3 text-xs">
+                <div>
+                    <p class="text-slate-500 uppercase font-semibold text-[10px]">Crash Multiplier Outcome</p>
+                    <p id="modal-multiplier" class="text-sm font-bold text-emerald-300 mt-0.5"></p>
+                </div>
+                <div>
+                    <p class="text-slate-500 uppercase font-semibold text-[10px]">Server Seed (Revealed Post-Round)</p>
+                    <p id="modal-server-seed" class="p-2 bg-slate-950 rounded border border-slate-800 text-slate-300 break-all select-all text-[11px]">
+                    </p>
+                </div>
+                <div>
+                    <p class="text-slate-500 uppercase font-semibold text-[10px]">Server Seed Hash (Pre-committed)</p>
+                    <p id="modal-server-hash" class="p-2 bg-slate-950 rounded border border-slate-800 text-orange-300 break-all select-all text-[11px]">
+                    </p>
+                </div>
+                <div>
+                    <p class="text-slate-500 uppercase font-semibold text-[10px]">Client Seed</p>
+                    <p id="modal-client-seed" class="p-2 bg-slate-950 rounded border border-slate-800 text-blue-300 break-all select-all text-[11px]">
+                    </p>
+                </div>
+                <div>
+                    <p class="text-slate-500 uppercase font-semibold text-[10px]">Hash Verification Check</p>
+                    <p id="modal-verify-result" class="p-2 bg-slate-950 rounded border border-slate-800 text-slate-400 text-[11px]">
+                        Click "Run Verification" to hash the server seed and compare.
+                    </p>
+                </div>
+            </div>
+            <div class="pt-2 flex justify-between items-center gap-2">
+                <button onclick="runHashVerification()" class="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-xs font-sans font-semibold cursor-pointer">
+                    🔐 Run Verification
+                </button>
+                <button onclick="closeModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-sans font-semibold cursor-pointer">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ================================================================
+        //  CONFIG
+        // ================================================================
+        const API_BASE = window.__API_BASE__ || (location.protocol === "file:" ? "http://localhost:8787" : "https://worker.bagsim.co.ke");
+        const WALLET_KEY = "demo_wallet_play";
+        const STARTING_BALANCE = 10000;
+
+        // ================================================================
+        //  WALLET
+        // ================================================================
+        function loadWallet() {
+            const raw = localStorage.getItem(WALLET_KEY);
+            const n = raw !== null ? Number(raw) : NaN;
+            if (!Number.isFinite(n)) {
+                localStorage.setItem(WALLET_KEY, String(STARTING_BALANCE));
+                return STARTING_BALANCE;
+            }
+            return n;
+        }
+
+        function saveWallet(v) {
+            localStorage.setItem(WALLET_KEY, String(v));
+        }
+        let wallet = loadWallet();
+
+        function renderWallet() {
+            document.getElementById("wallet-balance").innerText =
+                `KES ${wallet.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        }
+        renderWallet();
+
+        function resetWallet() {
+            if (!confirm("Reset demo balance back to KES 10,000?\nThis will not affect other pages.")) return;
+            wallet = STARTING_BALANCE;
+            saveWallet(wallet);
+            renderWallet();
+        }
+
+        // ================================================================
+        //  MOBILE CONSOLE TABS
+        // ================================================================
+        let mobileActive = 'B';
+
+        function switchMobileConsole(id) {
+            mobileActive = id;
+            document.getElementById('pane-A').classList.toggle('active', id === 'A');
+            document.getElementById('pane-B').classList.toggle('active', id === 'B');
+            document.getElementById('mob-tab-A').className = id === 'A' ?
+                "py-2 rounded font-bold bg-emerald-600 text-slate-950" :
+                "py-2 rounded font-bold text-slate-400";
+            document.getElementById('mob-tab-B').className = id === 'B' ?
+                "py-2 rounded font-bold bg-orange-600 text-slate-950" :
+                "py-2 rounded font-bold text-slate-400";
+        }
+
+        // ================================================================
+        //  ROUND STATE — server is the single source of truth
+        // ================================================================
+        let phase = 'idle'; // 'idle' | 'countdown' | 'climbing' | 'crashed'
+        let lastPhase = 'idle';
+
+        let climbStartAt = null; // epoch ms — from server
+
+        let crashMultiplier = null; // null while live, number once crashed
+        let currentMultiplier = 1.00;
+
+        let currentRoundId = null;
+        let serverTimeOffset = 0;
+
+        let recentCrashHistory = [];
+        let recentRounds = [];
+
+        function parseServerTimestamp(str) {
+            if (!str) return Date.now();
+            let f = str.replace(' ', 'T');
+            if (!f.endsWith('Z')) f += 'Z';
+            return new Date(f).getTime();
+        }
+
+        function estimatedServerNow() {
+            return Date.now() + serverTimeOffset;
+        }
+
+        // ================================================================
+        //  CONSOLE STATE
+        // ================================================================
+        const consoles = {
+            A: {
+                staged: false,
+                stagedStake: 0,
+                slip: null
+            },
+            B: {
+                staged: false,
+                stagedStake: 0,
+                slip: null
+            }
+        };
+
+        // ================================================================
+        //  MODE
+        // ================================================================
+        let isGlobalMode = true;
+        let lockedLocalMode = false;
+
+        function toggleGlobalMode() {
+            isGlobalMode = !isGlobalMode;
+            lockedLocalMode = !isGlobalMode;
+            const badge = document.getElementById("mode-badge");
+            const banner = document.getElementById("local-lock-banner");
+            if (isGlobalMode) {
+                badge.innerText = "[ GLOBAL ]";
+                badge.className = "bg-emerald-950/80 border border-emerald-800 px-3 py-1 rounded text-[10px] sm:text-xs font-mono font-bold text-emerald-400 cursor-pointer hover:bg-emerald-900 transition-colors";
+                banner.classList.add("hidden");
+            } else {
+                badge.innerText = "[ LOCAL ]";
+                badge.className = "bg-amber-950/80 border border-amber-800 px-3 py-1 rounded text-[10px] sm:text-xs font-mono font-bold text-amber-400 cursor-pointer hover:bg-amber-900 transition-colors";
+                banner.classList.remove("hidden");
+            }
+            resetLocalRoundState();
+            updatePlaceButtons();
+            updateCashoutChips();
+            sync();
+        }
+
+        function resetLocalRoundState() {
+            phase = 'idle';
+            lastPhase = 'idle';
+            climbStartAt = null;
+            crashMultiplier = null;
+            currentMultiplier = 1.00;
+            currentRoundId = null;
+        }
+
+        // ================================================================
+        //  STAKE INPUTS
+        // ================================================================
+        function parseStake(id) {
+            const raw = String(document.getElementById(`stake-${id}`).value || "").replace(/[^\d]/g, "");
+            return Math.max(0, Math.floor(Number(raw) || 0));
+        }
+
+        function pickStake(id, amount) {
+            if (lockedLocalMode) return flashLocked(id);
+            document.getElementById(`stake-${id}`).value = String(amount);
+            highlightChips('stake-chip', id, amount);
+        }
+
+        function nudgeStake(id, delta) {
+            if (lockedLocalMode) return flashLocked(id);
+            const cur = parseStake(id);
+            const next = Math.max(0, cur + delta);
+            document.getElementById(`stake-${id}`).value = String(next);
+            highlightChips('stake-chip', id, next);
+        }
+        ['A', 'B'].forEach(id => {
+            document.getElementById(`stake-${id}`).addEventListener('input', e => {
+                const v = Number(String(e.target.value).replace(/[^\d]/g, "")) || 0;
+                highlightChips('stake-chip', id, v);
+            });
+        });
+
+        function highlightChips(cls, id, value) {
+            document.querySelectorAll(`[data-${cls}="${id}"]`).forEach(btn => {
+                const v = Number(btn.dataset.value);
+                const active = v === value;
+                btn.classList.remove("chip-active", "chip-active-orange");
+                if (active) btn.classList.add(id === 'A' ? "chip-active" : "chip-active-orange");
+            });
+        }
+
+        function flashLocked(id) {
+            const el = document.getElementById(`slip-status-${id}`);
+            const prev = el.innerText;
+            el.innerText = "LOCAL mode — betting disabled";
+            el.className = "text-center font-mono text-[11px] text-amber-400 bg-amber-950/40 border border-amber-800 rounded-lg py-2 px-2 min-h-[34px] flex items-center justify-center";
+            setTimeout(() => {
+                el.innerText = prev;
+                el.className = "text-center font-mono text-[11px] text-slate-500 bg-slate-950 border border-slate-800 rounded-lg py-2 px-2 min-h-[34px] flex items-center justify-center";
+            }, 1400);
+        }
+
+        // ================================================================
+        //  PLACE / CANCEL
+        // ================================================================
+        function placeOrCancel(id) {
+            if (lockedLocalMode) return flashLocked(id);
+            const c = consoles[id];
+
+            // Global mode: place bet on server — only during countdown
+            if (isGlobalMode) {
+                if (phase !== 'countdown') {
+                    setSlipStatus(id, "Betting closed — round in progress", "text-amber-400 bg-amber-950/40 border-amber-800");
+                    return;
+                }
+                const stake = parseStake(id);
+                if (stake <= 0) {
+                    setSlipStatus(id, "Enter a stake greater than 0.", "text-amber-400 bg-amber-950/40 border-amber-800");
+                    return;
+                }
+                const exitMult = Math.max(1.01, Number(document.getElementById(`exit-${id}`).value) || 2.00);
+                if (c.slip && !c.slip.settled) {
+                    setSlipStatus(id, "BET ACTIVE", "text-slate-500 bg-slate-950 border-slate-800");
+                    return;
+                }
+                placeGlobalBet(id, stake, exitMult);
+                return;
+            }
+
+            // Cancel a queued (staged) bet
+            if (c.staged) {
+                c.staged = false;
+                c.stagedStake = 0;
+                setSlipStatus(id, "IDLE — set stake & tap PLACE BET", "text-slate-500 bg-slate-950 border-slate-800");
+                updatePlaceButtons();
+                return;
+            }
+
+            // If a slip is live, block re-placement
+            if (c.slip && !c.slip.settled) return;
+
+            const stake = parseStake(id);
+            if (stake <= 0) {
+                setSlipStatus(id, "Enter a stake greater than 0.", "text-amber-400 bg-amber-950/40 border-amber-800");
+                return;
+            }
+            if (stake > wallet) {
+                setSlipStatus(id, `Insufficient wallet — KES ${wallet.toFixed(2)} available.`, "text-red-400 bg-red-950/40 border-red-800");
+                return;
+            }
+
+            // Can only lock in during countdown. Otherwise queue for next round.
+            const canLockNow = (phase === 'countdown');
+            if (canLockNow) {
+                lockInNow(id, stake);
+            } else {
+                c.staged = true;
+                c.stagedStake = stake;
+                setSlipStatus(id, `QUEUED — KES ${stake.toFixed(2)} for next round`, "text-blue-300 bg-blue-950/30 border-blue-900");
+                updatePlaceButtons();
+            }
+        }
+
+        function lockInNow(id, stake) {
+            const c = consoles[id];
+            if (stake > wallet) {
+                setSlipStatus(id, `Insufficient wallet — KES ${wallet.toFixed(2)} available.`, "text-red-400 bg-red-950/40 border-red-800");
+                c.staged = false;
+                c.stagedStake = 0;
+                updatePlaceButtons();
+                return;
+            }
+            wallet -= stake;
+            saveWallet(wallet);
+            renderWallet();
+            c.staged = false;
+            c.stagedStake = 0;
+            c.slip = {
+                roundId: currentRoundId,
+                stake,
+                riding: stake,
+                banked: 0,
+                settled: false
+            };
+            setSlipStatus(id, `LOCKED — KES ${stake.toFixed(2)} riding`, "text-blue-300 bg-blue-950/30 border-blue-900");
+            updatePlaceButtons();
+            updateCashoutChips();
+            refreshReturnReadout(id);
+        }
+
+        // ================================================================
+        //  GLOBAL BET PLACEMENT (server API)
+        // ================================================================
+        async function placeGlobalBet(id, stake, exitMultiplier) {
+            const c = consoles[id];
+            if (!currentRoundId) {
+                setSlipStatus(id, "No active global round.", "text-amber-400 bg-amber-950/40 border-amber-800");
+                return;
+            }
+            try {
+                const res = await fetch(`${API_BASE}/api/bet/place`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        roundId: currentRoundId,
+                        name: `Player ${id}`,
+                        stake: stake,
+                        exitMultiplier: exitMultiplier
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    setSlipStatus(id, `Bet failed: ${data.error || 'Unknown error'}`, "text-red-400 bg-red-950/40 border-red-800");
+                    return;
+                }
+                wallet -= stake;
+                saveWallet(wallet);
+                renderWallet();
+                c.slip = {
+                    roundId: currentRoundId,
+                    stake: stake,
+                    exitMultiplier: exitMultiplier,
+                    ticketId: data.ticket_id,
+                    riding: stake,
+                    banked: 0,
+                    settled: false
+                };
+                setSlipStatus(id, `GLOBAL BET PLACED — KES ${stake.toFixed(2)} @ exit ${exitMultiplier.toFixed(2)}x`, "text-blue-300 bg-blue-950/30 border-blue-900");
+                updatePlaceButtons();
+                updateCashoutChips();
+                refreshReturnReadout(id);
+            } catch (e) {
+                setSlipStatus(id, "Network error placing bet.", "text-red-400 bg-red-950/40 border-red-800");
+            }
+        }
+
+        function updatePlaceButtons() {
+            ['A', 'B'].forEach(id => {
+                const c = consoles[id];
+                const btn = document.getElementById(`place-${id}`);
+                if (lockedLocalMode) {
+                    btn.disabled = true;
+                    btn.className = "w-full bg-slate-800 text-slate-500 font-mono font-extrabold py-3 rounded-xl uppercase tracking-wider cursor-not-allowed";
+                    btn.innerText = "PLACE BET";
+                } else if (c.staged) {
+                    btn.disabled = false;
+                    btn.className = "w-full bg-red-600 hover:bg-red-500 active:bg-red-400 text-slate-950 font-mono font-extrabold py-3 rounded-xl uppercase tracking-wider cursor-pointer transition-colors";
+                    btn.innerText = `✕ CANCEL QUEUED BET`;
+                } else if (c.slip && !c.slip.settled) {
+                    btn.disabled = true;
+                    btn.className = "w-full bg-slate-800 text-slate-500 font-mono font-extrabold py-3 rounded-xl uppercase tracking-wider cursor-not-allowed";
+                    btn.innerText = "BET ACTIVE";
+                } else {
+                    btn.disabled = false;
+                    btn.className = id === 'A' ?
+                        "w-full bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-400 text-slate-950 font-mono font-extrabold py-3 rounded-xl uppercase tracking-wider cursor-pointer transition-colors" :
+                        "w-full bg-orange-600 hover:bg-orange-500 active:bg-orange-400 text-slate-950 font-mono font-extrabold py-3 rounded-xl uppercase tracking-wider cursor-pointer transition-colors";
+                    btn.innerText = "PLACE BET";
+                }
+            });
+        }
+
+        // ================================================================
+        //  SLIP SETTLEMENT & CASHOUT
+        // ================================================================
+        function settleSlip(id, multiplier, reason) {
+            const c = consoles[id];
+            if (!c.slip || c.slip.settled) return;
+            c.slip.settled = true;
+            c.slip.reason = reason;
+
+            if (reason === 'busted') {
+                const lost = c.slip.riding;
+                setSlipStatus(
+                    id,
+                    c.slip.banked > 0 ?
+                    `BUSTED — kept KES ${c.slip.banked.toFixed(2)}, lost KES ${lost.toFixed(2)}` :
+                    `BUSTED — lost KES ${lost.toFixed(2)}`,
+                    "text-red-400 bg-red-950/40 border-red-800"
+                );
+            } else if (reason === 'cashed-full') {
+                setSlipStatus(
+                    id,
+                    `CASHED OUT @ ${multiplier.toFixed(2)}x → banked KES ${c.slip.banked.toFixed(2)}`,
+                    "text-emerald-300 bg-emerald-950/30 border-emerald-800"
+                );
+            }
+            updateCashoutChips();
+            updatePlaceButtons();
+        }
+
+        function fullCashout(id) {
+            const c = consoles[id];
+            if (!c.slip || c.slip.settled) return;
+            if (phase !== 'climbing' || currentMultiplier <= 1.0) return;
+            partialCashout(id, 100);
+        }
+
+        function partialCashout(id, pct) {
+            const c = consoles[id];
+            if (!c.slip || c.slip.settled) return;
+            if (phase !== 'climbing' || currentMultiplier <= 1.0) return;
+
+            const liveReturns = c.slip.riding * currentMultiplier;
+            const bankAmount = liveReturns * (pct / 100);
+            const newRiding = liveReturns - bankAmount;
+
+            wallet += bankAmount;
+            saveWallet(wallet);
+            renderWallet();
+
+            c.slip.banked += bankAmount;
+
+            if (pct >= 100 || newRiding < 0.01) {
+                c.slip.riding = 0;
+                settleSlip(id, currentMultiplier, 'cashed-full');
+                setSlipStatus(
+                    id,
+                    `CASHED OUT @ ${currentMultiplier.toFixed(2)}x → banked KES ${c.slip.banked.toFixed(2)}`,
+                    "text-emerald-300 bg-emerald-950/30 border-emerald-800"
+                );
+            } else {
+                c.slip.riding = newRiding / currentMultiplier;
+                setSlipStatus(
+                    id,
+                    `BANKED KES ${bankAmount.toFixed(2)} @ ${currentMultiplier.toFixed(2)}x — KES ${newRiding.toFixed(2)} still riding`,
+                    "text-emerald-300 bg-emerald-950/30 border-emerald-800"
+                );
+            }
+            refreshReturnReadout(id);
+            updateCashoutChips();
+        }
+
+        function refreshReturnReadout(id) {
+            const c = consoles[id];
+            const wrap = document.getElementById(`live-return-${id}`);
+            const amountEl = document.getElementById(`live-return-amount-${id}`);
+            const ridingEl = document.getElementById(`riding-amount-${id}`);
+            const bankedEl = document.getElementById(`banked-amount-${id}`);
+
+            const showCard = phase === 'climbing' && c.slip && !c.slip.settled && c.slip.riding > 0;
+            if (!showCard) {
+                wrap.classList.add("hidden");
+                wrap.classList.remove("armed");
+                return;
+            }
+            wrap.classList.remove("hidden");
+            wrap.classList.add("armed");
+
+            const liveReturns = c.slip.riding * currentMultiplier;
+            amountEl.innerText = `KES ${liveReturns.toFixed(2)}`;
+            ridingEl.innerText = c.slip.riding.toFixed(2);
+            bankedEl.innerText = c.slip.banked.toFixed(2);
+        }
+
+        function setSlipStatus(id, text, cls) {
+            const el = document.getElementById(`slip-status-${id}`);
+            el.innerText = text;
+            el.className = `text-center font-mono text-[11px] ${cls || "text-slate-500 bg-slate-950 border-slate-800"} border rounded-lg py-2 px-2 min-h-[34px] flex items-center justify-center`;
+        }
+
+        function updateCashoutChips() {
+            const active = !lockedLocalMode && phase === 'climbing' && currentMultiplier > 1.0;
+            ['A', 'B'].forEach(id => {
+                const c = consoles[id];
+                const canCash = active && c.slip && !c.slip.settled && c.slip.riding > 0;
+                document.querySelectorAll(`[data-cash-chip="${id}"]`).forEach(btn => {
+                    if (canCash) {
+                        btn.disabled = false;
+                        btn.classList.remove("cursor-not-allowed", "text-slate-400");
+                        btn.classList.add("cursor-pointer", "text-slate-950");
+                    } else {
+                        btn.disabled = true;
+                        btn.classList.add("cursor-not-allowed", "text-slate-400");
+                        btn.classList.remove("cursor-pointer", "text-slate-950");
+                    }
+                });
+            });
+        }
+
+        // ================================================================
+        //  CLOCK (UI only)
+        // ================================================================
+        setInterval(() => {
+            document.getElementById("clock").innerText = new Date().toLocaleTimeString('en-US', {
+                hour12: false
+            });
+        }, 1000);
+
+        // ================================================================
+        //  HISTORY UI
+        // ================================================================
+        function updateHistoryUI(m) {
+            recentCrashHistory.unshift(m);
+            if (recentCrashHistory.length > 6) recentCrashHistory.pop();
+            const c = document.getElementById("recent-crashes");
+            c.innerHTML = "";
+            recentCrashHistory.forEach(v => {
+                const b = document.createElement("button");
+                const cls = v >= 2.0 ?
+                    "text-emerald-400 border-emerald-900 hover:bg-emerald-950/60" :
+                    "text-amber-400 border-amber-900 hover:bg-amber-950/60";
+                b.className = `bg-slate-950 px-2 py-0.5 rounded border ${cls} cursor-pointer transition-colors`;
+                b.innerText = `${v.toFixed(2)}x`;
+                const r = recentRounds.find(x => Number(x.crash_multiplier).toFixed(2) === v.toFixed(2));
+                if (r) b.onclick = () => openModal(r);
+                c.appendChild(b);
+            });
+        }
+
+        async function fetchHistoryBar() {
+            try {
+                const res = await fetch(`${API_BASE}/api/history?mode=global`, {
+                    cache: "no-store"
+                });
+                const data = await res.json();
+                recentRounds = Array.isArray(data) ? data : [];
+
+                const ticker = document.getElementById("history-ticker");
+                if (!recentRounds.length) {
+                    ticker.innerHTML = `<span class="text-slate-600 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">--</span>`;
+                    return;
+                }
+                ticker.innerHTML = "";
+                recentRounds.slice(0, 12).forEach(r => {
+                    if (r.id === currentRoundId) return;
+                    const m = Number(r.crash_multiplier) || 1;
+                    const b = document.createElement("button");
+                    const cls = m >= 2.0 ?
+                        "text-emerald-400 border-emerald-900 hover:bg-emerald-950/60" :
+                        "text-amber-400 border-amber-900 hover:bg-amber-950/60";
+                    b.className = `bg-slate-950 px-2 py-0.5 rounded border ${cls} whitespace-nowrap cursor-pointer transition-colors`;
+                    b.innerText = `${m.toFixed(2)}x`;
+                    b.onclick = () => openModal(r);
+                    ticker.appendChild(b);
+                });
+
+                const c = document.getElementById("recent-crashes");
+                c.innerHTML = "";
+                recentCrashHistory.forEach(v => {
+                    const b = document.createElement("button");
+                    const cls = v >= 2.0 ?
+                        "text-emerald-400 border-emerald-900 hover:bg-emerald-950/60" :
+                        "text-amber-400 border-amber-900 hover:bg-amber-950/60";
+                    b.className = `bg-slate-950 px-2 py-0.5 rounded border ${cls} cursor-pointer transition-colors`;
+                    b.innerText = `${v.toFixed(2)}x`;
+                    const r = recentRounds.find(x => Number(x.crash_multiplier).toFixed(2) === v.toFixed(2));
+                    if (r) b.onclick = () => openModal(r);
+                    c.appendChild(b);
+                });
+            } catch (e) { /* silent */ }
+        }
+
+        // ================================================================
+        //  ORBIT RING (kept minimal — no-op if element missing)
+        // ================================================================
+        function setOrbit(state) {
+            const ring = document.getElementById("orbit-ring");
+            if (!ring) return;
+            ring.classList.remove("spinning", "crashed");
+            if (state === "spinning") ring.classList.add("spinning");
+            else if (state === "crashed") ring.classList.add("crashed");
+        }
+
+        // ================================================================
+        //  ANIMATION LOOP — uses server anchors only
+        // ================================================================
+        function animate() {
+            try {
+                const now = estimatedServerNow();
+                const mini = document.getElementById("mini-multiplier");
+                const status = document.getElementById("mini-status");
+                const pl = document.getElementById("phase-label");
+                const ll = document.getElementById("lock-label");
+                const lm = document.getElementById("live-multiplier");
+
+                if (phase === 'countdown' && climbStartAt) {
+                    const remainingMs = Math.max(0, climbStartAt - now);
+                    const remainingSec = Math.ceil(remainingMs / 1000);
+
+                    if (mini) {
+                        mini.innerText = `${remainingSec}s`;
+                        mini.className = "text-4xl sm:text-5xl font-black font-mono text-blue-400 glow-blue transition-colors duration-200";
+                    }
+                    if (status) status.innerText = `COUNTDOWN — LOCKING BETS`;
+                    if (pl) pl.innerText = "COUNTDOWN";
+                    if (ll) ll.innerText = "NOW";
+                    setOrbit("idle");
+
+                } else if (phase === 'climbing' && climbStartAt) {
+                    const elapsedSec = Math.max(0, (now - climbStartAt) / 1000);
+                    currentMultiplier = Math.exp(0.038 * elapsedSec);
+
+                    if (mini) {
+                        mini.innerText = `${currentMultiplier.toFixed(2)}x`;
+                        mini.className = "text-4xl sm:text-5xl font-black font-mono text-emerald-400 glow-green transition-colors duration-200";
+                    }
+                    if (status) status.innerText = `CLIMBING ACTIVE`;
+                    if (pl) pl.innerText = "CLIMBING";
+                    if (ll) ll.innerText = "LOCKED";
+                    setOrbit("spinning");
+
+                    ['A', 'B'].forEach(id => refreshReturnReadout(id));
+                    updateCashoutChips();
+
+                } else if (phase === 'crashed' && crashMultiplier != null) {
+                    if (mini) {
+                        mini.innerText = `${crashMultiplier.toFixed(2)}x`;
+                        mini.className = "text-4xl sm:text-5xl font-black font-mono text-red-500 glow-red transition-colors duration-200";
+                    }
+                    if (status) status.innerText = `CRASHED`;
+                    if (pl) pl.innerText = "CRASHED";
+                    if (ll) ll.innerText = "--";
+                    setOrbit("crashed");
+                }
+
+                if (lm) {
+                    lm.innerText = `${currentMultiplier.toFixed(2)}x`;
+                    lm.className = phase === 'crashed' ?
+                        "text-red-500 font-black text-sm" :
+                        phase === 'countdown' ?
+                        "text-blue-400 font-black text-sm" :
+                        "text-emerald-400 font-black text-sm";
+                }
+            } catch (e) {
+                console.warn("animate frame error:", e);
+            }
+            requestAnimationFrame(animate);
+        }
+        requestAnimationFrame(animate);
+
+        // ================================================================
+        //  SERVER SYNC — authoritative phase + anchors
+        // ================================================================
+        async function sync() {
+            try {
+                const res = await fetch(`${API_BASE}/api/state?mode=global`, {
+                    cache: "no-store"
+                });
+                const data = await res.json();
+                if (!data || !data.round) {
+                    phase = 'idle';
+                    return;
+                }
+
+                // Recalibrate clock offset
+                const serverNow = parseServerTimestamp(data.server_time);
+                serverTimeOffset = serverNow - Date.now();
+
+                const r = data.round;
+                const newRound = r.id !== currentRoundId;
+
+                climbStartAt = data.climb_start_at;
+
+                // Phase transition bookkeeping
+                const serverPhase = data.phase || 'idle';
+
+                if (newRound) {
+                    // Reset local round state
+                    currentRoundId = r.id;
+                    currentMultiplier = 1.0;
+                    crashMultiplier = null;
+
+                    // Settle leftover slips from previous round (shouldn't happen if crash hook fired)
+                    ['A', 'B'].forEach(id => {
+                        const c = consoles[id];
+                        if (c.slip && !c.slip.settled) settleSlip(id, currentMultiplier, 'busted');
+                        c.slip = null;
+                        const lr = document.getElementById(`live-return-${id}`);
+                        if (lr) {
+                            lr.classList.add("hidden");
+                            lr.classList.remove("armed");
+                        }
+
+                        // Promote any staged bet into the new round
+                        if (c.staged && c.stagedStake) {
+                            lockInNow(id, c.stagedStake);
+                        } else {
+                            setSlipStatus(id, "IDLE — set stake & tap PLACE BET", "text-slate-500 bg-slate-950 border-slate-800");
+                        }
+                    });
+                    updatePlaceButtons();
+                    updateCashoutChips();
+
+                    const mri = document.getElementById("mini-round-id");
+                    if (mri) mri.innerText = `Round #${r.id}`;
+                }
+
+                // Latch crash value + fire crash side-effects exactly once
+                if (serverPhase === 'crashed' && r.crash_multiplier != null) {
+                    crashMultiplier = Number(r.crash_multiplier);
+                    currentMultiplier = crashMultiplier;
+
+                    if (lastPhase !== 'crashed') {
+                        onCrash(crashMultiplier);
+                    }
+                }
+
+                lastPhase = serverPhase;
+                phase = serverPhase;
+
+            } catch (e) {
+                // Network hiccup — keep last-known state, try again next tick
+            }
+        }
+
+        function onCrash(mult) {
+            updateHistoryUI(mult);
+            fetchHistoryBar();
+
+            ['A', 'B'].forEach(id => {
+                const c = consoles[id];
+                if (c.slip && !c.slip.settled) settleSlip(id, mult, 'busted');
+            });
+            updateCashoutChips();
+            refreshReturnReadout('A');
+            refreshReturnReadout('B');
+        }
+
+        // ================================================================
+        //  PROVABLY FAIR MODAL
+        // ================================================================
+        let activeModalRound = null;
+
+        function openModal(round) {
+            activeModalRound = round;
+            document.getElementById("modal-round-id").innerText = `(Round #${round.id})`;
+            document.getElementById("modal-multiplier").innerText = `${(Number(round.crash_multiplier) || 1.00).toFixed(2)}x`;
+            document.getElementById("modal-server-seed").innerText = round.server_seed || 'Revealed post-round';
+            document.getElementById("modal-server-hash").innerText = round.server_seed_hash || 'N/A';
+            document.getElementById("modal-client-seed").innerText = round.client_seed || 'N/A';
+            document.getElementById("modal-verify-result").innerText = 'Click "Run Verification" to hash the server seed and compare.';
+            document.getElementById("modal-verify-result").className = "p-2 bg-slate-950 rounded border border-slate-800 text-slate-400 text-[11px]";
+            document.getElementById("pf-modal").classList.remove("hidden");
+        }
+
+        function closeModal() {
+            document.getElementById("pf-modal").classList.add("hidden");
+            activeModalRound = null;
+        }
+
+        async function runHashVerification() {
+            const resultEl = document.getElementById("modal-verify-result");
+            if (!activeModalRound || !activeModalRound.server_seed || !activeModalRound.server_seed_hash) {
+                resultEl.innerText = "Cannot verify: missing server_seed or server_seed_hash.";
+                resultEl.className = "p-2 bg-slate-950 rounded border border-amber-800 text-amber-400 text-[11px]";
+                return;
+            }
+            try {
+                const encoder = new TextEncoder();
+                const data = encoder.encode(activeModalRound.server_seed);
+                const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+                const hashArray = Array.from(new Uint8Array(hashBuffer));
+                const computedHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+                if (computedHash === activeModalRound.server_seed_hash) {
+                    resultEl.innerText = `✅ MATCH — hash(server_seed) === server_seed_hash\n${computedHash}`;
+                    resultEl.className = "p-2 bg-emerald-950/40 rounded border border-emerald-700 text-emerald-300 text-[11px] break-all";
+                } else {
+                    resultEl.innerText = `❌ MISMATCH\nComputed: ${computedHash}\nExpected: ${activeModalRound.server_seed_hash}`;
+                    resultEl.className = "p-2 bg-red-950/40 rounded border border-red-800 text-red-300 text-[11px] break-all";
+                }
+            } catch (e) {
+                resultEl.innerText = `Verification error: ${e.message}`;
+                resultEl.className = "p-2 bg-red-950/40 rounded border border-red-800 text-red-300 text-[11px]";
+            }
+        }
+
+        // ================================================================
+        //  BOOT
+        // ================================================================
+        sync();
+        fetchHistoryBar();
+        setInterval(sync, 500);
+        setInterval(fetchHistoryBar, 4000);
+
+        ['A', 'B'].forEach(id => highlightChips('stake-chip', id, -1));
+        updatePlaceButtons();
+        updateCashoutChips();
+        setOrbit("idle");
+        switchMobileConsole('B');
+    </script>
+</body>
+
+</html>
