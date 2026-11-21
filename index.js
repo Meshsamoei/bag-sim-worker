@@ -450,12 +450,32 @@ export default {
                 }
 
                 const { results } = await env.DB.prepare(
-                    `SELECT id, phone, display_name, role, created_at, last_login_at FROM users ORDER BY id DESC`
+                    `SELECT id, phone, display_name, role, shop_id, created_at, last_login_at FROM users ORDER BY id DESC`
                 ).all();
 
                 return Response.json({
                     success: true,
                     users: results || []
+                }, { headers: corsHeaders });
+            }
+
+            // ROUTE: /api/auth/shop-profile  (lists workers in the caller's shop)
+            if (path === '/api/auth/shop-profile' && request.method === 'GET') {
+                const token = extractToken(request);
+                const sessionUser = await getSessionUser(env.DB, token);
+                if (!sessionUser) {
+                    return Response.json({ error: 'Not authenticated.' }, { status: 401, headers: corsHeaders });
+                }
+                const shopId = sessionUser.shop_id || 'default';
+
+                const { results } = await env.DB.prepare(
+                    `SELECT id, phone, display_name, role, shop_id, created_at, last_login_at FROM users WHERE shop_id = ? ORDER BY role ASC, id DESC`
+                ).bind(shopId).all();
+
+                return Response.json({
+                    success: true,
+                    shop_id: shopId,
+                    workers: results || []
                 }, { headers: corsHeaders });
             }
 
@@ -477,6 +497,11 @@ export default {
                 const isGlobal = body.is_global || false;
                 const slips = body.slips || [];
                 const shopId = String(body.shop_id || sessionUser.shop_id || 'default').substring(0, 64);
+
+                // Non-admin must operate within their own shop
+                if (sessionUser.role !== 'admin' && shopId !== sessionUser.shop_id) {
+                    return Response.json({ error: 'Cannot launch rounds outside your shop.' }, { status: 403, headers: corsHeaders });
+                }
 
                 if (!isGlobal && (!Array.isArray(slips) || slips.length === 0)) {
                     return Response.json(
@@ -873,13 +898,18 @@ export default {
                 if (!sessionUser) {
                     return Response.json({ error: 'Authentication required.' }, { status: 401, headers: corsHeaders });
                 }
-                if (sessionUser.role !== 'teller' && sessionUser.role !== 'admin') {
-                    return Response.json({ error: 'Teller role required.' }, { status: 403, headers: corsHeaders });
+                if (sessionUser.role !== 'teller' && sessionUser.role !== 'cashier' && sessionUser.role !== 'admin') {
+                    return Response.json({ error: 'Teller or cashier role required.' }, { status: 403, headers: corsHeaders });
                 }
 
                 const body = await request.json().catch(() => ({}));
                 const { roundId, name, stake, multiplier, shop_id } = body;
                 const effectiveShopId = String(shop_id || sessionUser.shop_id || 'default').substring(0, 64);
+
+                // Non-admin must operate within their own shop
+                if (sessionUser.role !== 'admin' && effectiveShopId !== sessionUser.shop_id) {
+                    return Response.json({ error: 'Cannot place bets outside your shop.' }, { status: 403, headers: corsHeaders });
+                }
 
                 if (!roundId || !stake || !multiplier) {
                     return Response.json({ error: 'Missing required bet parameters' }, { status: 400, headers: corsHeaders });
@@ -909,16 +939,32 @@ export default {
                 if (!sessionUser) {
                     return Response.json({ error: 'Authentication required.' }, { status: 401, headers: corsHeaders });
                 }
-                if (sessionUser.role !== 'cashier' && sessionUser.role !== 'admin') {
-                    return Response.json({ error: 'Cashier role required.' }, { status: 403, headers: corsHeaders });
+                if (sessionUser.role !== 'cashier' && sessionUser.role !== 'teller' && sessionUser.role !== 'admin') {
+                    return Response.json({ error: 'Cashier or teller role required.' }, { status: 403, headers: corsHeaders });
                 }
 
                 const body = await request.json().catch(() => ({}));
                 const { roundId, ticketId, settlement_method, shop_id } = body;
                 const effectiveShopId = String(shop_id || sessionUser.shop_id || 'default').substring(0, 64);
 
+                // Non-admin must operate within their own shop
+                if (sessionUser.role !== 'admin' && effectiveShopId !== sessionUser.shop_id) {
+                    return Response.json({ error: 'Cannot settle tickets outside your shop.' }, { status: 403, headers: corsHeaders });
+                }
+
                 if (!roundId || !ticketId) {
                     return Response.json({ error: 'Missing settlement parameters' }, { status: 400, headers: corsHeaders });
+                }
+
+                // Verify the bet belongs to the user's shop before settling
+                const betCheck = await env.DB.prepare(
+                    `SELECT id, shop_id FROM local_bets WHERE (round_id = ? AND (ticket_code = ? OR id = ?)) LIMIT 1`
+                ).bind(roundId, ticketId, ticketId).first();
+                if (!betCheck) {
+                    return Response.json({ error: 'Bet not found.' }, { status: 404, headers: corsHeaders });
+                }
+                if (sessionUser.role !== 'admin' && betCheck.shop_id !== sessionUser.shop_id) {
+                    return Response.json({ error: 'Cannot settle bets from another shop.' }, { status: 403, headers: corsHeaders });
                 }
 
                 const method = ['cash', 'mpesa'].includes(settlement_method) ? settlement_method : 'cash';
