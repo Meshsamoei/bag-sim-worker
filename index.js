@@ -148,6 +148,15 @@ function normalizePhone(raw) {
     return null;
 }
 
+// Generate a procedural shop_id from phone + display name so no one ever gets 'default'
+function generateShopId(phone, displayName) {
+    const prefix = 'SHOP';
+    const phoneDigits = (phone || '').replace(/\D/g, '').slice(-4);
+    const nameBits = (displayName || 'player').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 6);
+    const randomBits = Math.floor(Math.random() * 65536).toString(16).padStart(4, '0');
+    return `${prefix}-${nameBits}-${phoneDigits}-${randomBits}`;
+}
+
 function isValidPassword(pw) {
     return typeof pw === 'string' && pw.length >= 6 && pw.length <= 64;
 }
@@ -280,7 +289,9 @@ export default {
                 const password = body.password;
                 const displayName = (body.display_name || '').toString().trim().substring(0, 40) || null;
                 const role = ['teller', 'cashier', 'admin'].includes(body.role) ? body.role : 'cashier';
-                const shopId = String(body.shop_id || 'default').substring(0, 64);
+                const shopId = body.shop_id && String(body.shop_id).trim() && String(body.shop_id).trim() !== 'default'
+                    ? String(body.shop_id).trim().substring(0, 64)
+                    : generateShopId(phone, displayName);
 
                 if (!phone) {
                     return Response.json(
