@@ -472,8 +472,10 @@
         // ================================================================
         async function fetchHistoryAndRounds() {
             try {
-                const modeQuery = isGlobalMode ? "global" : "local";
-                const res = await fetch(`${API_BASE}/api/history?mode=${modeQuery}`, {
+                // Round selector always shows LOCAL rounds for this shop (cashier only settles local)
+                const user = Auth.getUser();
+                const shopId = user && user.shop_id ? user.shop_id : 'default';
+                const res = await fetch(`${API_BASE}/api/history?mode=local&shop_id=${encodeURIComponent(shopId)}`, {
                     cache: "no-store"
                 });
                 const data = await res.json();
@@ -483,6 +485,7 @@
 
                 if (!Array.isArray(data) || data.length === 0) {
                     tickerContainer.innerHTML = `<span class="text-slate-600 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">--</span>`;
+                    selector.innerHTML = `<option value="">No local rounds</option>`;
                     return;
                 }
 
@@ -522,11 +525,13 @@
         }
 
         async function loadSelectedRoundTickets(roundId) {
+            const user = Auth.getUser();
+            const shopId = user && user.shop_id ? user.shop_id : 'default';
             const container = document.getElementById("tickets-container");
             container.innerHTML = `<div class="text-center py-10 text-slate-500 animate-pulse">Fetching physical ticket slips...</div>`;
 
             try {
-                const res = await fetch(`${API_BASE}/api/round?id=${roundId}&mode=local`, {
+                const res = await fetch(`${API_BASE}/api/round?id=${roundId}&mode=local&shop_id=${encodeURIComponent(shopId)}`, {
                     cache: "no-store"
                 });
                 const data = await res.json();
