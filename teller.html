@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bag-Sim Teller Terminal with Live Display & History Bar</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        .grid-bg {
+            background-image: linear-gradient(to right, rgba(16, 185, 129, 0.07) 1px, transparent 1px), linear-gradient(to bottom, rgba(16, 185, 129, 0.07) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans flex flex-col justify-between grid-bg select-none">
+
+    <!-- ================================================================ -->
+    <!--  AUTH GATE                                                       -->
+    <!-- ================================================================ -->
+    <div id="auth-gate" class="fixed inset-0 z-[100] bg-slate-950 grid-bg flex items-center justify-center p-4">
+        <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 sm:p-8 font-mono">
+
+            <div class="flex flex-col items-center mb-6">
+                <div class="flex flex-col items-center leading-none mb-3">
+                    <span class="text-[10px] font-black tracking-widest text-orange-500">THE BAG</span>
+                    <span class="text-lg font-black tracking-wider text-white">SIMULATOR</span>
+                </div>
+                <div id="auth-role-badge"
+                    class="bg-emerald-950/80 border border-emerald-800 px-3 py-1 rounded text-[10px] font-bold text-emerald-400 uppercase tracking-widest">
+                    TELLER ACCESS
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-1 mb-5 bg-slate-950 border border-slate-800 rounded-lg p-1">
+                <button id="tab-login" onclick="AuthUI.showLogin()"
+                    class="py-2 rounded text-xs font-bold uppercase tracking-widest bg-emerald-600 text-slate-950">
+                    Login
+                </button>
+                <button id="tab-register" onclick="AuthUI.showRegister()"
+                    class="py-2 rounded text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-white">
+                    Register
+                </button>
+            </div>
+
+            <form id="auth-form" onsubmit="AuthUI.submit(event)" class="space-y-3">
+                <div>
+                    <label class="text-[10px] uppercase tracking-widest text-slate-400 block mb-1">Phone Number</label>
+                    <input id="auth-phone" type="tel" required placeholder="07XX XXX XXX  ·  01XX XXX XXX  ·  +254..."
+                        autocomplete="username"
+                        class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-emerald-600" />
+                </div>
+
+                <div id="field-display-name" class="hidden">
+                    <label class="text-[10px] uppercase tracking-widest text-slate-400 block mb-1">Display Name <span
+                            class="text-slate-600">(optional)</span></label>
+                    <input id="auth-name" type="text" maxlength="40" placeholder="e.g. Jane W."
+                        class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-emerald-600" />
+                </div>
+
+                <div>
+                    <label class="text-[10px] uppercase tracking-widest text-slate-400 block mb-1">Password</label>
+                    <input id="auth-password" type="password" required minlength="6" maxlength="64"
+                        autocomplete="current-password" placeholder="••••••••"
+                        class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-emerald-600" />
+                </div>
+
+                <div id="auth-error" class="text-[11px] text-red-400 min-h-[16px]"></div>
+
+                <button id="auth-submit" type="submit"
+                    class="w-full bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black py-3 rounded-lg uppercase tracking-widest text-xs cursor-pointer transition-colors">
+                    Sign In
+                </button>
+            </form>
+
+            <p class="text-[10px] text-slate-500 text-center mt-5 leading-relaxed">
+                Authorized staff only. Sessions expire after 30 days.<br> Contact your shop admin if you've lost access.
+            </p>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header
+        class="flex flex-col sm:flex-row justify-between items-center px-4 sm:px-6 py-3 bg-slate-900 border-b border-slate-800 z-10 gap-2">
+        <div class="flex items-center space-x-3">
+            <span class="text-emerald-400 font-mono font-bold text-xs tracking-wider text-center sm:text-left">TELLER
+                SIMULATOR TERMINAL</span>
+        </div>
+        <div class="flex items-center space-x-4">
+            <div id="user-chip"
+                class="hidden items-center gap-2 bg-slate-950 border border-slate-700 rounded px-2.5 py-1 font-mono text-[11px]">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                <span id="user-chip-role" class="text-emerald-400 font-bold uppercase">TELLER</span>
+                <span id="user-chip-phone" class="text-slate-400">--</span>
+                <button onclick="AuthUI.logout()" class="text-slate-500 hover:text-red-400 ml-1 cursor-pointer"
+                    title="Sign out">⏻</button>
+            </div>
+            <div id="clock" class="font-mono text-xs text-slate-400">--:--:--</div>
+            <button onclick="toggleGlobalMode()" id="mode-badge"
+                class="bg-emerald-950/80 border border-emerald-800 px-3 py-1 rounded text-xs font-mono font-bold text-emerald-400 cursor-pointer hover:bg-emerald-900 transition-colors">
+                [ MODE: LOCAL ROUNDS ]
+            </button>
+            <a href="cashier.html" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1 rounded text-xs font-mono font-bold text-slate-400 cursor-pointer transition-colors">
+                → CASHIER
+            </a>
+        </div>
+    </header>
+
+    <!-- History Bar Ribbon -->
+    <section
+        class="w-full bg-slate-900/60 border-b border-slate-800 px-4 py-2 flex items-center justify-between z-10 font-mono text-xs">
+        <div class="flex items-center space-x-2 overflow-x-auto w-full">
+            <span class="text-slate-400 text-[10px] uppercase tracking-wider whitespace-nowrap">History Bar (<span
+                    id="history-mode-label">LOCAL</span>):</span>
+            <div id="global-history-ticker" class="flex gap-2 overflow-x-auto pb-0.5">
+                <span class="text-slate-600 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">--</span>
+            </div>
+        </div>
+        <div id="mode-indicator" class="text-[10px] font-mono text-emerald-400 font-bold hidden sm:block">LOCAL MODE</div>
+    </section>
+
+    <!-- Main Workbench + Mini Display -->
+    <main class="flex-1 p-3 sm:p-5 grid grid-cols-1 lg:grid-cols-12 gap-4 max-w-7xl w-full mx-auto z-10">
+
+        <!-- Left Box: Player Batch Entry -->
+        <div
+            class="lg:col-span-7 bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-2xl flex flex-col justify-between space-y-4">
+            <div>
+                <h2
+                    class="text-center font-mono font-bold text-xs text-emerald-400 uppercase tracking-widest border-b border-slate-800 pb-2 mb-3">
+                    PLAYER BATCH ENTRY
+                </h2>
+
+                <div class="space-y-1.5 mb-4">
+                    <label class="text-[10px] font-mono uppercase text-slate-400">Player Name</label>
+                    <input id="player-name" type="text" placeholder="Walk-in Player"
+                        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 font-mono text-lg font-bold text-emerald-400 text-center" />
+
+                    <div class="grid grid-cols-2 gap-2 mt-2">
+                        <div>
+                            <label class="text-[10px] font-mono uppercase text-slate-400 block mb-1">Stake (KES)</label>
+                            <input id="player-stake" type="text" inputmode="numeric" value="100"
+                                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 font-mono text-lg font-bold text-emerald-400 text-center" />
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-mono uppercase text-slate-400 block mb-1">Exit Multiplier</label>
+                            <input id="player-exit" type="text" inputmode="numeric" value="2.00"
+                                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 font-mono text-lg font-bold text-orange-400 text-center" />
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="addPlayerToBatch()"
+                    class="w-full bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-mono font-extrabold py-3 rounded-xl uppercase tracking-wider cursor-pointer">
+                    ADD PLAYER TO BATCH
+                </button>
+            </div>
+
+            <!-- Batch List -->
+            <div class="flex-1 min-h-0">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-[10px] font-mono uppercase text-slate-400">Queued Players</span>
+                    <span id="batch-count" class="text-emerald-400 font-bold">0</span>
+                </div>
+                <div id="batch-list" class="space-y-1 max-h-64 overflow-y-auto pr-1 font-mono text-xs">
+                    <p class="text-slate-500 text-center py-4">No players in batch.</p>
+                </div>
+                <div class="mt-3 flex justify-between items-center pt-3 border-t border-slate-800">
+                    <span class="text-[10px] font-mono text-slate-400">Total Pool:</span>
+                    <span id="batch-total-pool" class="text-emerald-400 font-bold">KES 0.00</span>
+                </div>
+            </div>
+
+            <button onclick="clearBatch()" class="w-full bg-red-950/60 hover:bg-red-900 border border-red-900 text-red-400 font-mono font-bold py-2 rounded-xl uppercase tracking-wider text-xs cursor-pointer">
+                CLEAR BATCH
+            </button>
+            <button onclick="launchLocalRound()" id="launch-btn"
+                class="w-full bg-orange-600 hover:bg-orange-500 text-slate-950 font-mono font-extrabold py-4 rounded-xl uppercase tracking-wider cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                LAUNCH LOCAL ROUND
+            </button>
+        </div>
+
+        <!-- Right Box: Mini Display Monitor -->
+        <div
+            class="lg:col-span-5 bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-2xl flex flex-col justify-between space-y-4">
+            <div>
+                <h2
+                    class="text-center font-mono font-bold text-xs text-orange-400 uppercase tracking-widest border-b border-slate-800 pb-2 mb-3">
+                    ROUND QUEUE & MINI DISPLAY
+                </h2>
+
+                <div
+                    class="w-full bg-slate-950 border border-emerald-900/60 rounded-xl p-4 text-center my-2 relative overflow-hidden">
+                    <div id="mini-multiplier" class="text-3xl sm:text-4xl font-black font-mono text-emerald-400">1.00x
+                    </div>
+                    <div id="mini-status" class="text-[10px] font-mono text-slate-400 uppercase mt-1">SYNCING
+                        TERMINAL...
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="text-[10px] font-mono uppercase text-slate-400 mb-1">Recent Crashes</div>
+                    <div id="recent-crashes" class="flex gap-1.5 overflow-x-auto pb-1 text-xs font-mono">
+                        <span class="text-slate-600 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">--</span>
+                    </div>
+                </div>
+
+                <div class="flex justify-between font-mono text-xs text-slate-300 py-1 border-b border-slate-800">
+                    <span>Queued Slips:</span>
+                    <span id="queue-slips-count" class="font-bold text-white">0</span>
+                </div>
+                <div class="flex justify-between font-mono text-xs text-slate-300 py-1 border-b border-slate-800 mb-2">
+                    <span>Aggregated Pool:</span>
+                    <span id="queue-pool-amount" class="font-bold text-emerald-400">KES 0.00</span>
+                </div>
+
+                <div id="queue-tickets-list" class="space-y-1.5 max-h-28 overflow-y-auto pr-1 font-mono text-[11px]">
+                    <p class="text-slate-500 text-center py-2">No active tickets queued.</p>
+                </div>
+            </div>
+
+            <div class="mt-4 pt-3 border-t border-slate-800">
+                <div class="flex justify-between items-center mb-2">
+                    <h3 class="font-mono text-[10px] uppercase text-emerald-400 tracking-wider">Live Round Slips &
+                        Status
+                    </h3>
+                    <span id="live-round-id-tag" class="text-[10px] font-mono text-slate-400">Round: --</span>
+                </div>
+                <div id="live-round-tickets-monitor"
+                    class="space-y-1.5 max-h-40 overflow-y-auto pr-1 font-mono text-[11px]">
+                    <p class="text-slate-500 text-center py-2">No active round tickets to monitor.</p>
+                </div>
+            </div>
+
+            <div class="space-y-1.5 mt-4">
+                <div id="launch-feedback" class="text-center font-mono text-[11px] text-emerald-400 h-3"></div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Local Rounds History Section -->
+    <section id="local-history-section" class="mt-6 p-3 sm:p-6 max-w-7xl w-full mx-auto z-10 hidden">
+        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-4 mb-6">
+                <div>
+                    <h2 class="font-mono font-bold text-xs text-amber-400 uppercase tracking-widest mb-1">Local Rounds History</h2>
+                    <p class="text-[10px] text-slate-400">All rounds for shop <span id="history-shop-id" class="font-bold text-orange-400">--</span></p>
+                </div>
+                <button onclick="fetchLocalHistory()" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded font-mono text-xs font-semibold cursor-pointer transition-colors">🔄 Refresh</button>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left font-mono text-[10px]">
+                    <thead class="bg-slate-950/60 text-slate-500 uppercase text-[9px] border-b border-slate-800">
+                        <tr>
+                            <th class="px-3 sm:px-4 py-2">Round #</th>
+                            <th class="px-3 sm:px-4 py-2">Crash</th>
+                            <th class="px-3 sm:px-4 py-2">Pool</th>
+                            <th class="px-3 sm:px-4 py-2">Shop</th>
+                            <th class="px-3 sm:px-4 py-2">Created</th>
+                            <th class="px-3 sm:px-4 py-2 text-right">Bets</th>
+                        </tr>
+                    </thead>
+                    <tbody id="local-history-body" class="divide-y divide-slate-800/60 text-slate-300">
+                        <!-- Populated via JS -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Bet detail for selected round -->
+            <div id="round-detail-panel" class="mt-6 hidden bg-slate-950 border border-slate-800 rounded-xl p-4">
+                <div class="flex justify-between items-center mb-3 border-b border-slate-800 pb-2">
+                    <h3 class="font-mono font-bold text-xs text-orange-400 uppercase tracking-widest">Round Bets</h3>
+                    <button onclick="document.getElementById('round-detail-panel').classList.add('hidden')" class="text-slate-500 hover:text-white font-bold">✕</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left font-mono text-[10px]">
+                        <thead class="bg-slate-950/60 text-slate-500 uppercase text-[9px] border-b border-slate-800">
+                            <tr>
+                                <th class="px-3 sm:px-4 py-2">Ticket</th>
+                                <th class="px-3 sm:px-4 py-2">Customer</th>
+                                <th class="px-3 sm:px-4 py-2">Stake</th>
+                                <th class="px-3 sm:px-4 py-2">Exit Mult</th>
+                                <th class="px-3 sm:px-4 py-2">Status</th>
+                                <th class="px-3 sm:px-4 py-2">Payout</th>
+                            </tr>
+                        </thead>
+                        <tbody id="round-bets-body" class="divide-y divide-slate-800/50">
+                            <!-- Populated via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        // ================================================================
+        //  CONFIG
+        // ================================================================
+        const API_BASE = window.__API_BASE__ || (location.protocol === "file:" ? "http://localhost:8787" : "https://worker.bagsim.co.ke");
+        const TOKEN_KEY = 'bagsim_token';
+        const USER_KEY = 'bagsim_user';
+
+        const POST_CRASH_CLEAR_DELAY_MS = 6000;
+
+        // ================================================================
+        //  AUTH CLIENT
+        // ================================================================
+        const Auth = {
+            getToken() {
+                return localStorage.getItem(TOKEN_KEY);
+            },
+            getUser() {
+                try {
+                    return JSON.parse(localStorage.getItem(USER_KEY) || 'null');
+                } catch {
+                    return null;
+                }
+            },
+            setSession(token, user) {
+                localStorage.setItem(TOKEN_KEY, token);
+                localStorage.setItem(USER_KEY, JSON.stringify(user));
+            },
+            clearSession() {
+                localStorage.removeItem(TOKEN_KEY);
+                localStorage.removeItem(USER_KEY);
+            },
+            authHeaders() {
+                const t = this.getToken();
+                return t ? {
+                    'Authorization': `Bearer ${t}`
+                } : {};
+            },
+            async login(phone, password) {
+                const res = await fetch(`${API_BASE}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        phone,
+                        password
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || 'Login failed');
+                this.setSession(data.token, data.user);
+                return data.user;
+            },
+            async register(phone, password, displayName, role) {
+                const res = await fetch(`${API_BASE}/api/auth/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        phone,
+                        password,
+                        display_name: displayName,
+                        role
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || 'Registration failed');
+                this.setSession(data.token, data.user);
+                return data.user;
+            },
+            async logout() {
+                try {
+                    await fetch(`${API_BASE}/api/auth/logout`, {
+                        method: 'POST',
+                        headers: Object.assign({
+                            'Content-Type': 'application/json'
+                        }, this.authHeaders())
+                    });
+                } catch { }
+                this.clearSession();
+            },
+            async verify() {
+                if (!this.getToken()) return null;
+                try {
+                    const res = await fetch(`${API_BASE}/api/auth/me`, {
+                        headers: this.authHeaders()
+                    });
+                    if (!res.ok) {
+                        this.clearSession();
+                        return null;
+                    }
+                    const data = await res.json();
+                    if (data.success) {
+                        localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+                        return data.user;
+                    }
+                } catch { }
+                return null;
+            }
+        };
+
+        // ================================================================
+        //  AUTH UI CONTROLLER
+        // ================================================================
+        const AuthUI = {
+            mode: 'login',
+            pageRole: 'teller',
+
+            showLogin() {
+                this.mode = 'login';
+                document.getElementById('tab-login').className = 'py-2 rounded text-xs font-bold uppercase tracking-widest bg-emerald-600 text-slate-950';
+                document.getElementById('tab-register').className = 'py-2 rounded text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-white';
+                document.getElementById('field-display-name').classList.add('hidden');
+                document.getElementById('auth-submit').innerText = 'Sign In';
+                document.getElementById('auth-error').innerText = '';
+                document.getElementById('auth-password').setAttribute('autocomplete', 'current-password');
+            },
+
+            showRegister() {
+                this.mode = 'register';
+                document.getElementById('tab-register').className = 'py-2 rounded text-xs font-bold uppercase tracking-widest bg-emerald-600 text-slate-950';
+                document.getElementById('tab-login').className = 'py-2 rounded text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-white';
+                document.getElementById('field-display-name').classList.remove('hidden');
+                document.getElementById('auth-submit').innerText = 'Create Account';
+                document.getElementById('auth-error').innerText = '';
+                document.getElementById('auth-password').setAttribute('autocomplete', 'new-password');
+            },
+
+            async submit(ev) {
+                ev.preventDefault();
+                const phone = document.getElementById('auth-phone').value.trim();
+                const password = document.getElementById('auth-password').value;
+                const displayName = document.getElementById('auth-name').value.trim();
+                const errEl = document.getElementById('auth-error');
+                const btn = document.getElementById('auth-submit');
+
+                errEl.innerText = '';
+                btn.disabled = true;
+                const original = btn.innerText;
+                btn.innerText = 'Please wait…';
+
+                try {
+                    let user;
+                    if (this.mode === 'login') {
+                        user = await Auth.login(phone, password);
+                    } else {
+                        user = await Auth.register(phone, password, displayName, this.pageRole);
+                    }
+                    this.onAuthenticated(user);
+                } catch (err) {
+                    errEl.innerText = err.message || 'Authentication failed.';
+                    btn.disabled = false;
+                    btn.innerText = original;
+                }
+            },
+
+            onAuthenticated(user) {
+                document.getElementById('auth-gate').classList.add('hidden');
+                const chip = document.getElementById('user-chip');
+                chip.classList.remove('hidden');
+                chip.classList.add('flex');
+                document.getElementById('user-chip-role').innerText = (user.role || this.pageRole).toUpperCase();
+                document.getElementById('user-chip-phone').innerText = user.phone || '';
+                if (typeof onAuthReady === 'function') onAuthReady(user);
+            },
+
+            async logout() {
+                if (!confirm('Sign out of this terminal?')) return;
+                await Auth.logout();
+                location.reload();
+            }
+        };
+
+        // ================================================================
+        //  LOCAL TELLER STATE — BATCH PLAYER ENTRY
+        // ================================================================
+        let currentStake = 0;
+        let targetMultiplier = 1.00;
+        let queuedSlips = [];
+        let batchPlayers = [];
+
+        // ================================================================
+        //  ROUND STATE
+        // ================================================================
+        let phase = 'idle';
+        let lastPhase = 'idle';
+        let climbStartAt = null;
+        let crashMultiplier = null;
+        let currentMultiplier = 1.00;
+        let currentRoundId = null;
+        let serverTimeOffset = 0;
+        let recentCrashHistory = [];
+        let isGlobalMode = false;
+        let postCrashCleanupTimer = null;
+        let previousTrackedRoundId = null;
+
+        // Live round bets
+        let activeRoundBets = [];
+
+        // NEW: blocks the live monitor from repopulating after a crash cleanup
+        // until a genuinely new round ID appears (teller launched).
+        let suppressLiveMonitorUntilNewRound = false;
+        let suppressedRoundId = null;
+
+        // ================================================================
+        //  UTILITIES
+        // ================================================================
+        function parseServerTimestamp(str) {
+            if (!str) return Date.now();
+            let f = str.replace(' ', 'T');
+            if (!f.endsWith('Z')) f += 'Z';
+            return new Date(f).getTime();
+        }
+
+        function estimatedServerNow() {
+            return Date.now() + serverTimeOffset;
+        }
+
+        setInterval(() => {
+            document.getElementById("clock").innerText = new Date().toLocaleTimeString('en-US', {
+                hour12: false
+            });
+        }, 1000);
+
+        // ================================================================
+        //  KEYBOARD SHORTCUTS
+        // ================================================================
+        window.addEventListener('keydown', (e) => {
+            const gateOpen = !document.getElementById('auth-gate').classList.contains('hidden');
+            if (gateOpen) return;
+            if (document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+
+            if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
+                if (document.activeElement.tagName !== 'BUTTON') addPlayerToBatch();
+            }
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                if (!isGlobalMode) launchLocalRound();
+            }
+        });
+
+        // ================================================================
+        //  BATCH PLAYER ENTRY
+        // ================================================================
+        function addPlayerToBatch() {
+            const nameEl = document.getElementById('player-name');
+            const stakeEl = document.getElementById('player-stake');
+            const exitEl = document.getElementById('player-exit');
+
+            const name = nameEl.value.trim() || 'Walk-in Player';
+            const stake = Math.max(0, Number(stakeEl.value) || 0);
+            const exitMult = Math.max(1.01, Number(exitEl.value) || 1.01);
+
+            if (stake <= 0) {
+                alert("Enter stake greater than 0");
+                return;
+            }
+
+            const player = {
+                id: Date.now() + Math.random(),
+                name: name.substring(0, 32),
+                stake: stake,
+                exitMultiplier: parseFloat(exitMult.toFixed(2))
+            };
+
+            batchPlayers.push(player);
+            nameEl.value = '';
+            updateBatchUI();
+        }
+
+        function removePlayerFromBatch(id) {
+            batchPlayers = batchPlayers.filter(p => p.id !== id);
+            updateBatchUI();
+        }
+
+        function clearBatch() {
+            batchPlayers = [];
+            updateBatchUI();
+        }
+
+        function updateBatchUI() {
+            const countEl = document.getElementById('batch-count');
+            const listEl = document.getElementById('batch-list');
+            const totalEl = document.getElementById('batch-total-pool');
+            const launchBtn = document.getElementById('launch-btn');
+
+            const totalPool = batchPlayers.reduce((sum, p) => sum + p.stake, 0);
+
+            countEl.innerText = batchPlayers.length;
+            totalEl.innerText = `KES ${totalPool.toFixed(2)}`;
+            launchBtn.disabled = batchPlayers.length === 0;
+
+            if (batchPlayers.length === 0) {
+                listEl.innerHTML = `<p class="text-slate-500 text-center py-4">No players in batch.</p>`;
+                return;
+            }
+
+            listEl.innerHTML = '';
+            batchPlayers.forEach(p => {
+                const item = document.createElement('div');
+                item.className = 'flex justify-between items-center bg-slate-950 p-2 rounded border border-slate-800 text-slate-300';
+                item.innerHTML = `
+                    <div class="flex flex-col">
+                        <div class="font-bold text-orange-400">${p.name}</div>
+                        <div class="text-[10px] text-slate-400">KES ${p.stake.toFixed(2)} @ exit ${p.exitMultiplier.toFixed(2)}x</div>
+                    </div>
+                    <button onclick="removePlayerFromBatch(${p.id})" class="text-red-400 hover:text-red-200 cursor-pointer">✕</button>
+                `;
+                listEl.appendChild(item);
+            });
+        }
+
+        // ================================================================
+        //  LIVE QUEUE BROADCAST (teller queue to other tellers)
+        // ================================================================
+        const TELLER_ID = (() => {
+            const u = Auth.getUser();
+            if (u && u.id) return `teller-${u.id}`;
+            let id = sessionStorage.getItem('bagsim_teller_id');
+            if (!id) {
+                id = 'teller-' + Math.random().toString(36).slice(2, 7);
+                sessionStorage.setItem('bagsim_teller_id', id);
+            }
+            return id;
+        })();
+
+        let queueBroadcastTimer = null;
+
+        function broadcastQueue() {
+            if (queueBroadcastTimer) clearTimeout(queueBroadcastTimer);
+            queueBroadcastTimer = setTimeout(async () => {
+                queueBroadcastTimer = null;
+                try {
+                    const slips = batchPlayers.map(p => ({
+                        ticket_code: `TKT-${Math.floor(1000 + Math.random() * 9000)}`,
+                        stake: p.stake,
+                        multiplier: p.exitMultiplier,
+                        name: p.name
+                    }));
+                    await fetch(`${API_BASE}/api/queue/publish`, {
+                        method: 'POST',
+                        headers: Object.assign({
+                            'Content-Type': 'application/json'
+                        }, Auth.authHeaders()),
+                        body: JSON.stringify({
+                            teller_id: TELLER_ID,
+                            slips: slips
+                        })
+                    });
+                } catch (e) { }
+            }, 150);
+        }
+
+        function updateQueueUI() {
+            document.getElementById("queue-slips-count").innerText = batchPlayers.length;
+            const totalPool = batchPlayers.reduce((sum, s) => sum + s.stake, 0);
+            document.getElementById("queue-pool-amount").innerText = `KES ${totalPool.toFixed(2)}`;
+            const listEl = document.getElementById("queue-tickets-list");
+            if (batchPlayers.length === 0) {
+                listEl.innerHTML = `<p class="text-slate-500 text-center py-2">No active tickets queued.</p>`;
+                broadcastQueue();
+                return;
+            }
+            listEl.innerHTML = "";
+            batchPlayers.forEach((slip) => {
+                const item = document.createElement("div");
+                item.className = "flex justify-between items-center bg-slate-950 p-1.5 rounded border border-slate-800 text-slate-300";
+                item.innerHTML = `
+                <div>
+                    <div class="font-bold text-orange-400">TKT-${Math.floor(1000 + Math.random() * 9000)}</div>
+                    <div class="text-[10px] text-slate-400">KES ${slip.stake.toFixed(2)} @ exit ${slip.exitMultiplier.toFixed(2)}x</div>
+                </div>
+            `;
+                listEl.appendChild(item);
+            });
+            broadcastQueue();
+        }
+
+        // ================================================================
+        //  HISTORY UI
+        // ================================================================
+        function updateRecentCrashesUI(mult) {
+            recentCrashHistory.unshift(mult);
+            if (recentCrashHistory.length > 5) recentCrashHistory.pop();
+            const container = document.getElementById("recent-crashes");
+            container.innerHTML = "";
+            recentCrashHistory.forEach(m => {
+                const badge = document.createElement("span");
+                const colorClass = m >= 2.0 ? "text-emerald-400 border-emerald-900" : "text-amber-400 border-amber-900";
+                badge.className = `bg-slate-950 px-2 py-0.5 rounded border ${colorClass}`;
+                badge.innerText = `${m.toFixed(2)}x`;
+                container.appendChild(badge);
+            });
+        }
+
+        async function fetchHistoryBar() {
+            try {
+                const modeQuery = isGlobalMode ? "global" : "local";
+                const user = Auth.getUser();
+                const shopId = user && user.shop_id ? user.shop_id : 'default';
+                const url = isGlobalMode ?
+                    `${API_BASE}/api/history?mode=${modeQuery}` :
+                    `${API_BASE}/api/history?mode=${modeQuery}&shop_id=${encodeURIComponent(shopId)}`;
+                const res = await fetch(url, {
+                    cache: "no-store"
+                });
+                const data = await res.json();
+                const container = document.getElementById("global-history-ticker");
+                if (!Array.isArray(data) || data.length === 0) {
+                    container.innerHTML = `<span class="text-slate-600 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">--</span>`;
+                    return;
+                }
+                container.innerHTML = "";
+                data.slice(0, 10).forEach(item => {
+                    const m = Number(item.crash_multiplier) || 1;
+                    const badge = document.createElement("span");
+                    const colorClass = m >= 2.0 ? "text-emerald-400 border-emerald-900" : "text-amber-400 border-amber-900";
+                    badge.className = `bg-slate-950 px-2 py-0.5 rounded border ${colorClass} whitespace-nowrap`;
+                    badge.innerText = `${m.toFixed(2)}x`;
+                    container.appendChild(badge);
+                });
+            } catch (e) { }
+        }
+
+        // ================================================================
+        //  LOCAL ROUNDS HISTORY
+        // ================================================================
+        async function fetchLocalHistory() {
+            try {
+                const user = Auth.getUser();
+                const shopId = user && user.shop_id ? user.shop_id : 'default';
+                document.getElementById("history-shop-id").innerText = shopId;
+
+                const res = await fetch(`${API_BASE}/api/history?mode=local&shop_id=${encodeURIComponent(shopId)}`, {
+                    cache: "no-store"
+                });
+                const data = await res.json();
+                const tbody = document.getElementById("local-history-body");
+                tbody.innerHTML = "";
+
+                if (!Array.isArray(data) || data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-slate-500">No local rounds yet.</td></tr>`;
+                    document.getElementById("local-history-section").classList.remove("hidden");
+                    return;
+                }
+
+                data.forEach(round => {
+                    const crash = round.crash_multiplier ? Number(round.crash_multiplier).toFixed(2) : "--";
+                    const isCrashed = round.crash_multiplier != null;
+                    const crashClass = isCrashed ? (Number(round.crash_multiplier) >= 2.0 ? "text-emerald-400" : "text-red-400") : "text-slate-500";
+                    const created = round.created_at ? new Date(round.created_at).toLocaleString() : "--";
+
+                    const tr = document.createElement("tr");
+                    tr.className = "hover:bg-slate-900/80 transition-colors cursor-pointer";
+                    tr.onclick = () => showRoundDetail(round);
+                    tr.innerHTML = `
+                        <td class="px-3 sm:px-4 py-3 font-bold text-orange-400">#${round.id}</td>
+                        <td class="px-3 sm:px-4 py-3 font-bold ${crashClass}">${isCrashed ? crash + "x" : "LIVE"}</td>
+                        <td class="px-3 sm:px-4 py-3 text-emerald-400 font-bold">KES ${Number(round.total_pool || 0).toFixed(2)}</td>
+                        <td class="px-3 sm:px-4 py-3 font-mono text-slate-500 text-[9px]">${round.shop_id || 'default'}</td>
+                        <td class="px-3 sm:px-4 py-3 text-slate-400 text-[9px]">${created}</td>
+                        <td class="px-3 sm:px-4 py-3 text-right font-bold text-slate-300">View</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                document.getElementById("local-history-section").classList.remove("hidden");
+            } catch (e) {
+                console.error("Failed to load local history:", e);
+            }
+        }
+
+        function showRoundDetail(round) {
+            const panel = document.getElementById("round-detail-panel");
+            const tbody = document.getElementById("round-bets-body");
+            tbody.innerHTML = "";
+
+            const bets = round.bets || [];
+            if (bets.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-slate-500">No bets for this round.</td></tr>`;
+            } else {
+                bets.forEach(bet => {
+                    const statusColor = bet.status === 'settled' ? "text-emerald-400" : bet.status === 'won' ? "text-emerald-400" : bet.status === 'busted' ? "text-red-400" : "text-slate-500";
+                    const payout = bet.won ? (Number(bet.stake) * Number(bet.multiplier || 1)).toFixed(2) : "0.00";
+                    const payoutClass = bet.won ? "text-emerald-400 font-bold" : "text-slate-500";
+
+                    const tr = document.createElement("tr");
+                    tr.innerHTML = `
+                        <td class="px-3 sm:px-4 py-3 font-mono font-bold text-orange-400">${bet.ticket_code}</td>
+                        <td class="px-3 sm:px-4 py-3 text-slate-300">${bet.customer_name}</td>
+                        <td class="px-3 sm:px-4 py-3 text-emerald-400 font-bold">KES ${Number(bet.stake).toFixed(2)}</td>
+                        <td class="px-3 sm:px-4 py-3 text-orange-400 font-bold">${Number(bet.multiplier || 1).toFixed(2)}x</td>
+                        <td class="px-3 sm:px-4 py-3 ${statusColor} font-bold">${bet.status}</td>
+                        <td class="px-3 sm:px-4 py-3 ${payoutClass}">KES ${payout}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            panel.classList.remove("hidden");
+            panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+
+        // ================================================================
+        //  LAUNCH LOCAL ROUND
+        // ================================================================
+        async function launchLocalRound() {
+            if (batchPlayers.length === 0) {
+                const feedback = document.getElementById("launch-feedback");
+                feedback.innerText = "Error: No players in batch!";
+                setTimeout(() => { feedback.innerText = ""; }, 3000);
+                return;
+            }
+
+            const totalPool = batchPlayers.reduce((sum, s) => sum + s.stake, 0);
+            const btn = document.getElementById("launch-btn");
+            const feedback = document.getElementById("launch-feedback");
+            btn.innerText = "TRANSMITTING...";
+            btn.disabled = true;
+
+            const slips = batchPlayers.map(p => ({
+                customer_name: p.name,
+                stake: p.stake,
+                multiplier: p.exitMultiplier
+            }));
+            const user = Auth.getUser();
+            const shopId = user && user.shop_id ? user.shop_id : 'default';
+
+            try {
+                const res = await fetch(`${API_BASE}/api/launch`, {
+                    method: "POST",
+                    headers: Object.assign({
+                        "Content-Type": "application/json"
+                    }, Auth.authHeaders()),
+                    body: JSON.stringify({
+                        total_pool: totalPool,
+                        is_demo: false,
+                        slips: slips,
+                        shop_id: shopId
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    feedback.innerText = `Launched Round #${data.round_id}!`;
+                    batchPlayers = [];
+                    updateBatchUI();
+                    updateQueueUI();
+
+                    suppressLiveMonitorUntilNewRound = false;
+                    suppressedRoundId = null;
+
+                    activeRoundBets = [];
+                    clearLiveRoundMonitor();
+
+                    sync();
+                    fetchHistoryBar();
+                } else if (res.status === 401) {
+                    feedback.innerText = `Session expired — please sign in again.`;
+                    Auth.clearSession();
+                    setTimeout(() => location.reload(), 1500);
+                } else if (res.status === 403) {
+                    feedback.innerText = `Not authorized: ${data.error || 'Teller role required.'}`;
+                } else {
+                    feedback.innerText = `Error: ${data.error || 'Failed'}`;
+                }
+            } catch (err) {
+                feedback.innerText = `Network Error`;
+            } finally {
+                btn.innerText = "LAUNCH LOCAL ROUND";
+                btn.disabled = batchPlayers.length === 0;
+                setTimeout(() => {
+                    feedback.innerText = "";
+                }, 3000);
+            }
+        }
+
+        // ================================================================
+        //  ANIMATION LOOP
+        // ================================================================
+        function animateMiniDisplay() {
+            try {
+                const now = estimatedServerNow();
+                const miniMult = document.getElementById("mini-multiplier");
+                const miniStatus = document.getElementById("mini-status");
+
+                if (phase === 'countdown' && climbStartAt) {
+                    const remainingSec = Math.ceil(Math.max(0, climbStartAt - now) / 1000);
+                    miniMult.innerText = `${remainingSec}s`;
+                    miniMult.className = "text-3xl sm:text-4xl font-black font-mono text-blue-400 transition-colors duration-200";
+                    miniStatus.innerText = `COUNTDOWN ROUND #${currentRoundId ?? '---'}`;
+                } else if (phase === 'climbing' && climbStartAt) {
+                    const elapsedSec = Math.max(0, (now - climbStartAt) / 1000);
+                    currentMultiplier = Math.exp(0.038 * elapsedSec);
+                    miniMult.innerText = `${currentMultiplier.toFixed(2)}x`;
+                    miniMult.className = "text-3xl sm:text-4xl font-black font-mono text-emerald-400 transition-colors duration-200";
+                    miniStatus.innerText = `CLIMBING ACTIVE`;
+                } else if (phase === 'crashed' && crashMultiplier != null) {
+                    miniMult.innerText = `${crashMultiplier.toFixed(2)}x`;
+                    miniMult.className = "text-3xl sm:text-4xl font-black font-mono text-red-500 transition-colors duration-200";
+                    miniStatus.innerText = `CRASHED`;
+                } else {
+                    if (!isGlobalMode && !currentRoundId) {
+                        miniMult.innerText = "1.00x";
+                        miniMult.className = "text-3xl sm:text-4xl font-black font-mono text-slate-500 transition-colors duration-200";
+                        miniStatus.innerText = "AWAITING LOCAL LAUNCH";
+                    }
+                }
+            } catch (e) { }
+            requestAnimationFrame(animateMiniDisplay);
+        }
+        requestAnimationFrame(animateMiniDisplay);
+
+        // ================================================================
+        //  MODE TOGGLE
+        // ================================================================
+        function toggleGlobalMode() {
+            isGlobalMode = !isGlobalMode;
+            const badge = document.getElementById("mode-badge");
+            const launchBtn = document.getElementById("launch-btn");
+            const historyModeLabel = document.getElementById("history-mode-label");
+            const modeIndicator = document.getElementById("mode-indicator");
+
+            if (isGlobalMode) {
+                badge.innerText = "[ MODE: GLOBAL (AUTO) ]";
+                badge.className = "bg-amber-950/80 border border-amber-800 px-3 py-1 rounded text-xs font-mono font-bold text-amber-400 cursor-pointer hover:bg-amber-900 transition-colors";
+                launchBtn.innerText = "GLOBAL AUTO-RUNNING";
+                launchBtn.disabled = true;
+                launchBtn.className = "w-full bg-slate-800 text-slate-500 font-mono font-extrabold py-4 rounded-xl uppercase tracking-wider cursor-not-allowed";
+                historyModeLabel.innerText = "GLOBAL";
+                modeIndicator.innerText = "GLOBAL MODE";
+                modeIndicator.className = "text-[10px] font-mono text-amber-400 font-bold sm:block";
+            } else {
+                badge.innerText = "[ MODE: LOCAL ROUNDS ]";
+                badge.className = "bg-emerald-950/80 border border-emerald-800 px-3 py-1 rounded text-xs font-mono font-bold text-emerald-400 cursor-pointer hover:bg-emerald-900 transition-colors";
+                launchBtn.innerText = "LAUNCH LOCAL ROUND";
+                launchBtn.disabled = batchPlayers.length === 0;
+                launchBtn.className = "w-full bg-orange-600 hover:bg-orange-500 text-slate-950 font-mono font-extrabold py-4 rounded-xl uppercase tracking-wider cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-colors";
+                historyModeLabel.innerText = "LOCAL";
+                modeIndicator.innerText = "LOCAL MODE";
+                modeIndicator.className = "text-[10px] font-mono text-emerald-400 font-bold sm:block";
+            }
+
+            resetRoundState();
+            sync();
+            fetchHistoryBar();
+        }
+
+        function resetRoundState() {
+            phase = 'idle';
+            lastPhase = 'idle';
+            climbStartAt = null;
+            crashMultiplier = null;
+            currentMultiplier = 1.00;
+            currentRoundId = null;
+            activeRoundBets = [];
+            previousTrackedRoundId = null;
+            suppressLiveMonitorUntilNewRound = false;
+            suppressedRoundId = null;
+
+            if (postCrashCleanupTimer) {
+                clearTimeout(postCrashCleanupTimer);
+                postCrashCleanupTimer = null;
+            }
+
+            document.getElementById("mini-multiplier").innerText = "1.00x";
+            document.getElementById("mini-multiplier").className = "text-3xl sm:text-4xl font-black font-mono text-slate-500 transition-colors duration-200";
+            document.getElementById("mini-status").innerText = "AWAITING LOCAL LAUNCH";
+            clearLiveRoundMonitor();
+        }
+
+        // ================================================================
+        //  LIVE ROUND MONITOR
+        // ================================================================
+        function clearLiveRoundMonitor() {
+            activeRoundBets = [];
+            document.getElementById("live-round-id-tag").innerText = "Round: --";
+            document.getElementById("live-round-tickets-monitor").innerHTML =
+                `<p class="text-slate-500 text-center py-2">No active round tickets to monitor.</p>`;
+        }
+
+        function renderLiveRoundMonitor(crashVal) {
+            const monitorEl = document.getElementById("live-round-tickets-monitor");
+
+            // Suppressed after a crash until a new round appears
+            if (suppressLiveMonitorUntilNewRound) {
+                clearLiveRoundMonitor();
+                return;
+            }
+
+            if (!currentRoundId || phase === 'idle' || !activeRoundBets || activeRoundBets.length === 0) {
+                clearLiveRoundMonitor();
+                return;
+            }
+
+            document.getElementById("live-round-id-tag").innerText = `Round #${currentRoundId}`;
+            monitorEl.innerHTML = "";
+
+            activeRoundBets.forEach(bet => {
+                const target = Number(bet.multiplier || bet.exitMultiplier || 1.0);
+                const stake = Number(bet.stake);
+                const payout = stake * target;
+
+                let statusHtml = "";
+                let cardBg = "bg-slate-950 border-slate-800";
+
+                if (phase === 'crashed') {
+                    const finalCrash = crashVal || crashMultiplier || 1.0;
+                    if (finalCrash >= target) {
+                        statusHtml = `<span class="text-emerald-400 font-bold bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-900">WON (+${payout.toFixed(2)})</span>`;
+                        cardBg = "bg-slate-950 border-emerald-900/50";
+                    } else {
+                        statusHtml = `<span class="text-red-400 font-bold bg-red-950/60 px-2 py-0.5 rounded border border-red-900">BUSTED</span>`;
+                        cardBg = "bg-slate-950 border-red-900/50";
+                    }
+                } else {
+                    statusHtml = `<span class="text-blue-400 font-bold animate-pulse bg-blue-950/40 px-2 py-0.5 rounded border border-blue-900/50">IN PLAY (LIVE)</span>`;
+                }
+
+                const item = document.createElement("div");
+                item.className = `flex justify-between items-center ${cardBg} p-2 rounded border text-slate-300`;
+                item.innerHTML = `
+                <div>
+                    <div class="font-bold text-orange-400">${bet.ticket_code}</div>
+                    <div class="text-[10px] text-slate-400">KES ${stake.toFixed(2)} @ ${target.toFixed(2)}x</div>
+                </div>
+                <div class="flex items-center space-x-2">
+                    ${statusHtml}
+                </div>
+            `;
+                monitorEl.appendChild(item);
+            });
+        }
+
+        // ================================================================
+        //  POST-CRASH CLEANUP
+        // ================================================================
+        function schedulePostCrashCleanup() {
+            if (postCrashCleanupTimer) clearTimeout(postCrashCleanupTimer);
+            postCrashCleanupTimer = setTimeout(() => {
+                postCrashCleanupTimer = null;
+                if (phase !== 'crashed') return;
+
+                // Enter suppression mode: block re-population until a new round
+                // ID appears from the server (i.e. teller launches again).
+                suppressLiveMonitorUntilNewRound = true;
+                suppressedRoundId = currentRoundId;
+
+                clearLiveRoundMonitor();
+
+                document.getElementById("mini-multiplier").innerText = "1.00x";
+                document.getElementById("mini-multiplier").className =
+                    "text-3xl sm:text-4xl font-black font-mono text-slate-500 transition-colors duration-200";
+                document.getElementById("mini-status").innerText = "AWAITING LOCAL LAUNCH";
+
+                crashMultiplier = null;
+                currentMultiplier = 1.00;
+                currentRoundId = null;
+                previousTrackedRoundId = null;
+
+                phase = 'idle';
+                lastPhase = 'idle';
+            }, POST_CRASH_CLEAR_DELAY_MS);
+        }
+
+        // ================================================================
+        //  SERVER SYNC
+        // ================================================================
+        async function sync() {
+            try {
+                const modeQuery = isGlobalMode ? "global" : "local";
+                const user = Auth.getUser();
+                const shopId = user && user.shop_id ? user.shop_id : 'default';
+                const url = isGlobalMode ?
+                    `${API_BASE}/api/state?mode=${modeQuery}` :
+                    `${API_BASE}/api/state?mode=${modeQuery}&shop_id=${encodeURIComponent(shopId)}`;
+                const res = await fetch(url, {
+                    cache: "no-store"
+                });
+                const data = await res.json();
+                if (!data || !data.round) {
+                    phase = 'idle';
+                    return;
+                }
+
+                const serverNow = parseServerTimestamp(data.server_time);
+                serverTimeOffset = serverNow - Date.now();
+
+                const r = data.round;
+                const newRound = r.id !== currentRoundId;
+
+                // If we're in suppression mode, ignore the SAME crashed round
+                // coming back from /api/state. Only react when the round ID changes.
+                if (suppressLiveMonitorUntilNewRound) {
+                    if (r.id === suppressedRoundId || r.id == suppressedRoundId) {
+                        // Same stale round — keep monitor empty, keep phase idle
+                        clearLiveRoundMonitor();
+                        phase = 'idle';
+                        lastPhase = 'idle';
+                        return;
+                    } else {
+                        // A new round ID appeared → lift suppression
+                        suppressLiveMonitorUntilNewRound = false;
+                        suppressedRoundId = null;
+                    }
+                }
+
+                if (previousTrackedRoundId && previousTrackedRoundId !== r.id) {
+                    activeRoundBets = [];
+                    clearLiveRoundMonitor();
+                    document.getElementById("live-round-id-tag").innerText = `Round: #${r.id}`;
+                    if (postCrashCleanupTimer) {
+                        clearTimeout(postCrashCleanupTimer);
+                        postCrashCleanupTimer = null;
+                    }
+                }
+                previousTrackedRoundId = r.id;
+
+                climbStartAt = data.climb_start_at;
+                const serverPhase = data.phase || 'idle';
+
+                if (newRound) {
+                    currentRoundId = r.id;
+                    currentMultiplier = 1.0;
+                    crashMultiplier = null;
+                }
+
+                if (serverPhase === 'crashed' && r.crash_multiplier != null) {
+                    crashMultiplier = Number(r.crash_multiplier);
+                    currentMultiplier = crashMultiplier;
+                    if (lastPhase !== 'crashed') {
+                        onCrash(crashMultiplier);
+                    }
+                }
+
+                lastPhase = serverPhase;
+                phase = serverPhase;
+
+            } catch (e) { }
+        }
+
+        function onCrash(mult) {
+            updateRecentCrashesUI(mult);
+            fetchHistoryBar();
+            schedulePostCrashCleanup();
+        }
+
+        // ================================================================
+        //  LIVE ROUND SLIP POLLING
+        // ================================================================
+        async function fetchActiveRoundStatus() {
+            // Suppressed after crash cleanup — don't even hit the network
+            if (suppressLiveMonitorUntilNewRound) {
+                clearLiveRoundMonitor();
+                return;
+            }
+
+            if (!currentRoundId) {
+                clearLiveRoundMonitor();
+                return;
+            }
+            if (phase !== 'countdown' && phase !== 'climbing' && phase !== 'crashed') return;
+
+            try {
+                const user = Auth.getUser();
+                const shopId = user && user.shop_id ? user.shop_id : 'default';
+                const res = await fetch(`${API_BASE}/api/round?id=${currentRoundId}&mode=local&shop_id=${encodeURIComponent(shopId)}`, {
+                    cache: "no-store"
+                });
+                const data = await res.json();
+                if (data.success && data.round && data.round.bets) {
+                    activeRoundBets = data.round.bets;
+                    renderLiveRoundMonitor(Number(data.round.crash_multiplier));
+                }
+            } catch (e) { }
+        }
+
+        // ================================================================
+        //  BOOT — gated behind auth
+        // ================================================================
+        let bootStarted = false;
+
+        function bootApp() {
+            if (bootStarted) return;
+            bootStarted = true;
+
+            sync();
+            fetchHistoryBar();
+            fetchLocalHistory();
+            clearLiveRoundMonitor();
+            setInterval(sync, 700);
+            setInterval(fetchHistoryBar, 4000);
+            setInterval(fetchLocalHistory, 10000);
+            setInterval(() => {
+                if (currentRoundId && (phase === 'climbing' || phase === 'crashed' || phase === 'countdown')) {
+                    fetchActiveRoundStatus();
+                }
+            }, 1000);
+        }
+
+        function onAuthReady() {
+            bootApp();
+        }
+
+        (async () => {
+            AuthUI.showLogin();
+            const user = await Auth.verify();
+            if (user) AuthUI.onAuthenticated(user);
+        })();
+    </script>
+</body>
+
+</html>

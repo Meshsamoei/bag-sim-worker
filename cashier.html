@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bag-Sim Cashier & Ticket Redemption Terminal</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        .grid-bg {
+            background-image: linear-gradient(to right, rgba(16, 185, 129, 0.07) 1px, transparent 1px), linear-gradient(to bottom, rgba(16, 185, 129, 0.07) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans flex flex-col justify-between grid-bg select-none">
+
+    <!-- ================================================================ -->
+    <!--  AUTH GATE                                                       -->
+    <!-- ================================================================ -->
+    <div id="auth-gate" class="fixed inset-0 z-[100] bg-slate-950 grid-bg flex items-center justify-center p-4">
+        <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 sm:p-8 font-mono">
+
+            <div class="flex flex-col items-center mb-6">
+                <div class="flex flex-col items-center leading-none mb-3">
+                    <span class="text-[10px] font-black tracking-widest text-orange-500">THE BAG</span>
+                    <span class="text-lg font-black tracking-wider text-white">SIMULATOR</span>
+                </div>
+                <div id="auth-role-badge"
+                    class="bg-amber-950/80 border border-amber-800 px-3 py-1 rounded text-[10px] font-bold text-amber-400 uppercase tracking-widest">
+                    CASHIER ACCESS
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-1 mb-5 bg-slate-950 border border-slate-800 rounded-lg p-1">
+                <button id="tab-login" onclick="AuthUI.showLogin()"
+                    class="py-2 rounded text-xs font-bold uppercase tracking-widest bg-emerald-600 text-slate-950">
+                    Login
+                </button>
+                <button id="tab-register" onclick="AuthUI.showRegister()"
+                    class="py-2 rounded text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-white">
+                    Register
+                </button>
+            </div>
+
+            <form id="auth-form" onsubmit="AuthUI.submit(event)" class="space-y-3">
+                <div>
+                    <label class="text-[10px] uppercase tracking-widest text-slate-400 block mb-1">Phone Number</label>
+                    <input id="auth-phone" type="tel" required placeholder="07XX XXX XXX  ·  01XX XXX XXX  ·  +254..."
+                        autocomplete="username"
+                        class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-emerald-600" />
+                </div>
+
+                <div id="field-display-name" class="hidden">
+                    <label class="text-[10px] uppercase tracking-widest text-slate-400 block mb-1">Display Name <span
+                            class="text-slate-600">(optional)</span></label>
+                    <input id="auth-name" type="text" maxlength="40" placeholder="e.g. Jane W."
+                        class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-emerald-600" />
+                </div>
+
+                <div>
+                    <label class="text-[10px] uppercase tracking-widest text-slate-400 block mb-1">Password</label>
+                    <input id="auth-password" type="password" required minlength="6" maxlength="64"
+                        autocomplete="current-password" placeholder="••••••••"
+                        class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-emerald-600" />
+                </div>
+
+                <div id="auth-error" class="text-[11px] text-red-400 min-h-[16px]"></div>
+
+                <button id="auth-submit" type="submit"
+                    class="w-full bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black py-3 rounded-lg uppercase tracking-widest text-xs cursor-pointer transition-colors">
+                    Sign In
+                </button>
+            </form>
+
+            <p class="text-[10px] text-slate-500 text-center mt-5 leading-relaxed">
+                Authorized staff only. Sessions expire after 30 days.<br> Contact your shop admin if you've lost access.
+            </p>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header
+        class="flex flex-col sm:flex-row justify-between items-center px-4 sm:px-6 py-3 bg-slate-900 border-b border-slate-800 z-10 gap-2">
+        <div class="flex items-center space-x-3">
+            <span
+                class="bg-emerald-600 text-white font-black px-3 py-1 rounded text-[10px] tracking-wider uppercase font-mono">CASHIER
+                POS</span>
+            <span class="text-slate-100 font-mono font-bold text-xs tracking-wider">TICKET REDEMPTION TERMINAL</span>
+        </div>
+        <div class="flex items-center space-x-4">
+            <div id="user-chip"
+                class="hidden items-center gap-2 bg-slate-950 border border-slate-700 rounded px-2.5 py-1 font-mono text-[11px]">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                <span id="user-chip-role" class="text-amber-400 font-bold uppercase">CASHIER</span>
+                <span id="user-chip-phone" class="text-slate-400">--</span>
+                <button onclick="AuthUI.logout()" class="text-slate-500 hover:text-red-400 ml-1 cursor-pointer"
+                    title="Sign out">⏻</button>
+            </div>
+            <div id="clock" class="font-mono text-xs text-slate-400">--:--:--</div>
+            <button onclick="toggleGlobalMode()" id="mode-badge"
+                class="bg-emerald-950/80 border border-emerald-800 px-3 py-1 rounded text-xs font-mono font-bold text-emerald-400 cursor-pointer hover:bg-emerald-900 transition-colors">
+                [ MODE: LOCAL ROUNDS ]
+            </button>
+            <a href="teller.html" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1 rounded text-xs font-mono font-bold text-slate-400 cursor-pointer transition-colors">
+                → TELLER
+            </a>
+        </div>
+    </header>
+
+    <!-- History Bar Ribbon -->
+    <section
+        class="w-full bg-slate-900/60 border-b border-slate-800 px-4 py-2 flex items-center justify-between z-10 font-mono text-xs">
+        <div class="flex items-center space-x-2 overflow-x-auto w-full">
+            <span class="text-slate-400 text-[10px] uppercase tracking-wider whitespace-nowrap">History Bar (<span
+                    id="history-mode-label">LOCAL</span>):</span>
+            <div id="global-history-ticker" class="flex gap-2 overflow-x-auto pb-0.5">
+                <span class="text-slate-600 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">--</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Main Workbench -->
+    <main class="flex-1 p-3 sm:p-5 grid grid-cols-1 lg:grid-cols-12 gap-4 max-w-7xl w-full mx-auto z-10">
+
+        <!-- Left Column: Live Round Monitor -->
+        <div
+            class="lg:col-span-5 bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-2xl flex flex-col justify-between space-y-4">
+            <div>
+                <h2
+                    class="text-center font-mono font-bold text-xs text-emerald-400 uppercase tracking-widest border-b border-slate-800 pb-2 mb-3">
+                    LIVE ROUND MONITOR
+                </h2>
+
+                <div
+                    class="w-full bg-slate-950 border border-emerald-900/60 rounded-xl p-4 text-center my-2 relative overflow-hidden">
+                    <div id="mini-multiplier" class="text-3xl sm:text-4xl font-black font-mono text-emerald-400">1.00x
+                    </div>
+                    <div id="mini-status" class="text-[10px] font-mono text-slate-400 uppercase mt-1">SYNCING
+                        TERMINAL...
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="text-[10px] font-mono uppercase text-slate-400 mb-1">Recent Crashes</div>
+                    <div id="recent-crashes" class="flex gap-1.5 overflow-x-auto pb-1 text-xs font-mono">
+                        <span class="text-slate-600 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">--</span>
+                    </div>
+                </div>
+
+                <div class="space-y-2 mt-4 pt-4 border-t border-slate-800 font-mono text-xs">
+                    <div class="flex justify-between text-slate-400">
+                        <span>Active Round ID:</span>
+                        <span id="active-round-label" class="text-white font-bold">--</span>
+                    </div>
+                    <div class="flex justify-between text-slate-400">
+                        <span>Server Time:</span>
+                        <span id="server-time-label" class="text-slate-200">--</span>
+                    </div>
+                    <div class="flex justify-between text-slate-400">
+                        <span>Server Sync:</span>
+                        <span id="sync-status-label" class="text-emerald-400">● LIVE</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-[11px] font-mono text-slate-400">
+                <span class="text-emerald-400 font-bold">POS Tip:</span> Select a completed round from the right panel
+                history or auto-sync queue to review slips handed over by customers.
+            </div>
+        </div>
+
+        <!-- Right Column: Ticket Redemption -->
+        <div
+            class="lg:col-span-7 bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-2xl flex flex-col justify-between space-y-4">
+            <div>
+                <div class="flex justify-between items-center border-b border-slate-800 pb-2 mb-3">
+                    <h2 class="font-mono font-bold text-xs text-orange-400 uppercase tracking-widest">
+                        TICKET REDEMPTION QUEUE
+                    </h2>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-[10px] font-mono text-slate-400">Round ID:</span>
+                        <select id="round-selector" onchange="onRoundSelectChange()"
+                            class="bg-slate-950 border border-slate-700 rounded px-2 py-1 font-mono text-xs text-emerald-400 focus:outline-none">
+                            <option value="">Select Round...</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="tickets-container" class="space-y-2 max-h-[380px] overflow-y-auto pr-1 font-mono text-xs">
+                    <div class="text-center py-12 text-slate-500 font-mono text-xs">
+                        No round loaded. Select or wait for an active round to populate physical tickets.
+                    </div>
+                </div>
+            </div>
+
+            <div
+                class="flex justify-between items-center pt-3 border-t border-slate-800 font-mono text-xs text-slate-400">
+                <span>Total Slips Found: <strong id="total-slips" class="text-white">0</strong></span>
+                <span>Pending Payouts: <strong id="pending-payouts-sum" class="text-amber-400">KES 0.00</strong></span>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // ================================================================
+        //  CONFIG
+        // ================================================================
+        const API_BASE = window.__API_BASE__ || (location.protocol === "file:" ? "http://localhost:8787" : "https://worker.bagsim.co.ke");
+        const TOKEN_KEY = 'bagsim_token';
+        const USER_KEY = 'bagsim_user';
+
+        // ================================================================
+        //  AUTH CLIENT
+        // ================================================================
+        const Auth = {
+            getToken() {
+                return localStorage.getItem(TOKEN_KEY);
+            },
+            getUser() {
+                try {
+                    return JSON.parse(localStorage.getItem(USER_KEY) || 'null');
+                } catch {
+                    return null;
+                }
+            },
+            setSession(token, user) {
+                localStorage.setItem(TOKEN_KEY, token);
+                localStorage.setItem(USER_KEY, JSON.stringify(user));
+            },
+            clearSession() {
+                localStorage.removeItem(TOKEN_KEY);
+                localStorage.removeItem(USER_KEY);
+            },
+            authHeaders() {
+                const t = this.getToken();
+                return t ? {
+                    'Authorization': `Bearer ${t}`
+                } : {};
+            },
+            async login(phone, password) {
+                const res = await fetch(`${API_BASE}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        phone,
+                        password
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || 'Login failed');
+                this.setSession(data.token, data.user);
+                return data.user;
+            },
+            async register(phone, password, displayName, role) {
+                const res = await fetch(`${API_BASE}/api/auth/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        phone,
+                        password,
+                        display_name: displayName,
+                        role
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || 'Registration failed');
+                this.setSession(data.token, data.user);
+                return data.user;
+            },
+            async logout() {
+                try {
+                    await fetch(`${API_BASE}/api/auth/logout`, {
+                        method: 'POST',
+                        headers: Object.assign({
+                            'Content-Type': 'application/json'
+                        }, this.authHeaders())
+                    });
+                } catch { }
+                this.clearSession();
+            },
+            async verify() {
+                if (!this.getToken()) return null;
+                try {
+                    const res = await fetch(`${API_BASE}/api/auth/me`, {
+                        headers: this.authHeaders()
+                    });
+                    if (!res.ok) {
+                        this.clearSession();
+                        return null;
+                    }
+                    const data = await res.json();
+                    if (data.success) {
+                        localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+                        return data.user;
+                    }
+                } catch { }
+                return null;
+            }
+        };
+
+        // ================================================================
+        //  AUTH UI CONTROLLER
+        // ================================================================
+        const AuthUI = {
+            mode: 'login',
+            pageRole: 'cashier',
+
+            showLogin() {
+                this.mode = 'login';
+                document.getElementById('tab-login').className = 'py-2 rounded text-xs font-bold uppercase tracking-widest bg-emerald-600 text-slate-950';
+                document.getElementById('tab-register').className = 'py-2 rounded text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-white';
+                document.getElementById('field-display-name').classList.add('hidden');
+                document.getElementById('auth-submit').innerText = 'Sign In';
+                document.getElementById('auth-error').innerText = '';
+                document.getElementById('auth-password').setAttribute('autocomplete', 'current-password');
+            },
+
+            showRegister() {
+                this.mode = 'register';
+                document.getElementById('tab-register').className = 'py-2 rounded text-xs font-bold uppercase tracking-widest bg-emerald-600 text-slate-950';
+                document.getElementById('tab-login').className = 'py-2 rounded text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-white';
+                document.getElementById('field-display-name').classList.remove('hidden');
+                document.getElementById('auth-submit').innerText = 'Create Account';
+                document.getElementById('auth-error').innerText = '';
+                document.getElementById('auth-password').setAttribute('autocomplete', 'new-password');
+            },
+
+            async submit(ev) {
+                ev.preventDefault();
+                const phone = document.getElementById('auth-phone').value.trim();
+                const password = document.getElementById('auth-password').value;
+                const displayName = document.getElementById('auth-name').value.trim();
+                const errEl = document.getElementById('auth-error');
+                const btn = document.getElementById('auth-submit');
+
+                errEl.innerText = '';
+                btn.disabled = true;
+                const original = btn.innerText;
+                btn.innerText = 'Please wait…';
+
+                try {
+                    let user;
+                    if (this.mode === 'login') {
+                        user = await Auth.login(phone, password);
+                    } else {
+                        user = await Auth.register(phone, password, displayName, this.pageRole);
+                    }
+                    this.onAuthenticated(user);
+                } catch (err) {
+                    errEl.innerText = err.message || 'Authentication failed.';
+                    btn.disabled = false;
+                    btn.innerText = original;
+                }
+            },
+
+            onAuthenticated(user) {
+                document.getElementById('auth-gate').classList.add('hidden');
+                const chip = document.getElementById('user-chip');
+                chip.classList.remove('hidden');
+                chip.classList.add('flex');
+                document.getElementById('user-chip-role').innerText = (user.role || this.pageRole).toUpperCase();
+                document.getElementById('user-chip-phone').innerText = user.phone || '';
+
+                if (typeof onAuthReady === 'function') onAuthReady(user);
+            },
+
+            async logout() {
+                if (!confirm('Sign out of this terminal?')) return;
+                await Auth.logout();
+                location.reload();
+            }
+        };
+
+        // ================================================================
+        //  STATE
+        // ================================================================
+        let phase = 'idle';
+        let lastPhase = 'idle';
+        let climbStartAt = null;
+        let crashMultiplier = null;
+        let currentMultiplier = 1.00;
+        let currentRoundId = null;
+        let serverTimeOffset = 0;
+        let recentCrashHistory = [];
+        let isGlobalMode = false;
+        let loadedRoundsCache = [];
+        let consecutiveSyncFailures = 0;
+
+        function parseServerTimestamp(str) {
+            if (!str) return Date.now();
+            let f = str.replace(' ', 'T');
+            if (!f.endsWith('Z')) f += 'Z';
+            return new Date(f).getTime();
+        }
+
+        function estimatedServerNow() {
+            return Date.now() + serverTimeOffset;
+        }
+
+        // Clock UI
+        setInterval(() => {
+            document.getElementById("clock").innerText = new Date().toLocaleTimeString('en-US', {
+                hour12: false
+            });
+        }, 1000);
+
+        // ================================================================
+        //  HISTORY & ROUND SELECTOR SYNC
+        // ================================================================
+        async function fetchHistoryAndRounds() {
+            try {
+                const modeQuery = isGlobalMode ? "global" : "local";
+                const res = await fetch(`${API_BASE}/api/history?mode=${modeQuery}`, {
+                    cache: "no-store"
+                });
+                const data = await res.json();
+
+                const tickerContainer = document.getElementById("global-history-ticker");
+                const selector = document.getElementById("round-selector");
+
+                if (!Array.isArray(data) || data.length === 0) {
+                    tickerContainer.innerHTML = `<span class="text-slate-600 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">--</span>`;
+                    return;
+                }
+
+                loadedRoundsCache = data;
+
+                tickerContainer.innerHTML = "";
+                data.slice(0, 10).forEach(item => {
+                    const m = Number(item.crash_multiplier) || 1;
+                    const badge = document.createElement("span");
+                    const colorClass = m >= 2.0 ? "text-emerald-400 border-emerald-900" : "text-amber-400 border-amber-900";
+                    badge.className = `bg-slate-950 px-2 py-0.5 rounded border ${colorClass} whitespace-nowrap`;
+                    badge.innerText = `${m.toFixed(2)}x`;
+                    tickerContainer.appendChild(badge);
+                });
+
+                const currentSelected = selector.value;
+                selector.innerHTML = `<option value="">Select Round...</option>`;
+                data.forEach(r => {
+                    const opt = document.createElement("option");
+                    opt.value = r.id;
+                    opt.innerText = `Round #${r.id} (${Number(r.crash_multiplier).toFixed(2)}x)`;
+                    if (String(r.id) === String(currentSelected)) opt.selected = true;
+                    selector.appendChild(opt);
+                });
+
+                if (!selector.value && data.length > 0) {
+                    selector.value = data[0].id;
+                    loadSelectedRoundTickets(data[0].id);
+                }
+
+            } catch (e) { /* suppress */ }
+        }
+
+        async function onRoundSelectChange() {
+            const roundId = document.getElementById("round-selector").value;
+            if (roundId) loadSelectedRoundTickets(roundId);
+        }
+
+        async function loadSelectedRoundTickets(roundId) {
+            const container = document.getElementById("tickets-container");
+            container.innerHTML = `<div class="text-center py-10 text-slate-500 animate-pulse">Fetching physical ticket slips...</div>`;
+
+            try {
+                const res = await fetch(`${API_BASE}/api/round?id=${roundId}&mode=local`, {
+                    cache: "no-store"
+                });
+                const data = await res.json();
+
+                if (!data.success || !data.round) {
+                    container.innerHTML = `<div class="text-center py-10 text-red-400">Failed to load tickets for round #${roundId}</div><br><div class="text-center py-10 text-slate-500">#${roundId} is a global round or not accessible.</div>`;
+                    return;
+                }
+
+                const round = data.round;
+                const crashVal = Number(round.crash_multiplier) || 1.0;
+                const bets = round.bets || [];
+
+                document.getElementById("total-slips").innerText = bets.length;
+
+                if (bets.length === 0) {
+                    container.innerHTML = `<div class="text-center py-10 text-slate-500">No physical ticket slips registered for Round #${roundId}.</div>`;
+                    document.getElementById("pending-payouts-sum").innerText = "KES 0.00";
+                    return;
+                }
+
+                let pendingSum = 0;
+                container.innerHTML = "";
+
+                bets.forEach(bet => {
+                    const targetMult = Number(bet.multiplier);
+                    const stake = Number(bet.stake);
+                    const isWin = crashVal >= targetMult;
+                    const payout = stake * targetMult;
+
+                    if (bet.status !== 'settled' && isWin) {
+                        pendingSum += payout;
+                    }
+
+                    let statusBadge = "";
+                    let actionHtml = "";
+
+                    if (bet.status === 'settled') {
+                        const methodText = bet.settlement_method ? ` (${bet.settlement_method.toUpperCase()})` : '';
+                        statusBadge = `<span class="bg-slate-800 text-slate-400 px-2 py-0.5 rounded text-[10px] font-bold">SETTLED${methodText}</span>`;
+                        actionHtml = `<span class="text-[11px] text-slate-500 font-mono">Paid Out</span>`;
+                    } else if (!isWin) {
+                        statusBadge = `<span class="bg-red-950/80 text-red-400 border border-red-900/50 px-2 py-0.5 rounded text-[10px] font-bold">BUSTED</span>`;
+                        actionHtml = `<span class="text-[11px] text-red-500/70 font-mono">Lost</span>`;
+                    } else {
+                        statusBadge = `<span class="bg-emerald-950/80 text-emerald-400 border border-emerald-900/50 px-2 py-0.5 rounded text-[10px] font-bold">WON (${payout.toFixed(2)} KES)</span>`;
+                        actionHtml = `
+                            <div class="flex items-center space-x-1">
+                                <button onclick="settleTicket(${round.id}, '${bet.ticket_code}', 'cash')" class="bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold px-2.5 py-1 rounded text-[10px] cursor-pointer transition-colors">CASH</button>
+                                <button onclick="settleTicket(${round.id}, '${bet.ticket_code}', 'mpesa')" class="bg-sky-600 hover:bg-sky-500 text-white font-bold px-2.5 py-1 rounded text-[10px] cursor-pointer transition-colors">M-PESA</button>
+                            </div>
+                        `;
+                    }
+
+                    const card = document.createElement("div");
+                    card.className = "bg-slate-950 border border-slate-800 p-3 rounded-xl flex items-center justify-between gap-2";
+                    card.innerHTML = `
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <span class="font-bold text-orange-400 font-mono">${bet.ticket_code}</span>
+                                <span class="text-slate-400 text-[10px]">(${bet.customer_name || 'Walk-in'})</span>
+                            </div>
+                            <div class="text-[11px] text-slate-400 mt-0.5">
+                                Stake: <strong class="text-white">KES ${stake.toFixed(2)}</strong> @ Target: <strong class="text-emerald-400">${targetMult.toFixed(2)}x</strong>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            ${statusBadge}
+                            ${actionHtml}
+                        </div>
+                    `;
+                    container.appendChild(card);
+                });
+
+                document.getElementById("pending-payouts-sum").innerText = `KES ${pendingSum.toFixed(2)}`;
+
+            } catch (err) {
+                container.innerHTML = `<div class="text-center py-10 text-red-400">Error loading round records.</div>`;
+            }
+        }
+
+        // ================================================================
+        //  SETTLEMENT ACTION  (sends auth token)
+        // ================================================================
+        async function settleTicket(roundId, ticketId, method) {
+            if (!confirm(`Confirm payout via ${method.toUpperCase()} for ticket [${ticketId}]?`)) return;
+
+            try {
+                const res = await fetch(`${API_BASE}/api/ticket/settle`, {
+                    method: "POST",
+                    headers: Object.assign({
+                        "Content-Type": "application/json"
+                    },
+                        Auth.authHeaders()
+                    ),
+                    body: JSON.stringify({
+                        roundId,
+                        ticketId,
+                        settlement_method: method
+                    })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    loadSelectedRoundTickets(roundId);
+                } else if (res.status === 401 || res.status === 403) {
+                    alert(`Settlement failed: ${data.error || 'You are not authorized.'}`);
+                    // Force re-auth if the session is bad
+                    if (res.status === 401) {
+                        Auth.clearSession();
+                        setTimeout(() => location.reload(), 800);
+                    }
+                } else {
+                    alert(`Settlement failed: ${data.error || 'Unknown error'}`);
+                }
+            } catch (e) {
+                alert("Network error during ticket settlement.");
+            }
+        }
+
+        // ================================================================
+        //  ANIMATION & STATE LOOP
+        // ================================================================
+        function animateMiniDisplay() {
+            try {
+                const now = estimatedServerNow();
+                const miniMult = document.getElementById("mini-multiplier");
+                const miniStatus = document.getElementById("mini-status");
+
+                if (phase === 'countdown' && climbStartAt) {
+                    const remainingMs = Math.max(0, climbStartAt - now);
+                    const remainingSec = Math.ceil(remainingMs / 1000);
+                    miniMult.innerText = `${remainingSec}s`;
+                    miniMult.className = "text-3xl sm:text-4xl font-black font-mono text-blue-400 transition-colors duration-200";
+                    miniStatus.innerText = `COUNTDOWN ROUND #${currentRoundId ?? '---'}`;
+                } else if (phase === 'climbing' && climbStartAt) {
+                    const elapsedSec = Math.max(0, (now - climbStartAt) / 1000);
+                    currentMultiplier = Math.exp(0.038 * elapsedSec);
+                    miniMult.innerText = `${currentMultiplier.toFixed(2)}x`;
+                    miniMult.className = "text-3xl sm:text-4xl font-black font-mono text-emerald-400 transition-colors duration-200";
+                    miniStatus.innerText = `CLIMBING ACTIVE`;
+                } else if (phase === 'crashed' && crashMultiplier != null) {
+                    miniMult.innerText = `${crashMultiplier.toFixed(2)}x`;
+                    miniMult.className = "text-3xl sm:text-4xl font-black font-mono text-red-500 transition-colors duration-200";
+                    miniStatus.innerText = `CRASHED`;
+                } else {
+                    miniMult.innerText = "1.00x";
+                    miniMult.className = "text-3xl sm:text-4xl font-black font-mono text-slate-500 transition-colors duration-200";
+                    miniStatus.innerText = "AWAITING ROUND";
+                }
+            } catch (e) { }
+            requestAnimationFrame(animateMiniDisplay);
+        }
+        requestAnimationFrame(animateMiniDisplay);
+
+        function updateRecentCrashesUI(mult) {
+            recentCrashHistory.unshift(mult);
+            if (recentCrashHistory.length > 5) recentCrashHistory.pop();
+            const container = document.getElementById("recent-crashes");
+            container.innerHTML = "";
+            recentCrashHistory.forEach(m => {
+                const badge = document.createElement("span");
+                const colorClass = m >= 2.0 ? "text-emerald-400 border-emerald-900" : "text-amber-400 border-amber-900";
+                badge.className = `bg-slate-950 px-2 py-0.5 rounded border ${colorClass}`;
+                badge.innerText = `${m.toFixed(2)}x`;
+                container.appendChild(badge);
+            });
+        }
+
+        async function sync() {
+            try {
+                const modeQuery = isGlobalMode ? "global" : "local";
+                const res = await fetch(`${API_BASE}/api/state?mode=${modeQuery}`, {
+                    cache: "no-store"
+                });
+                const data = await res.json();
+                if (!data || !data.round) {
+                    phase = 'idle';
+                    return;
+                }
+
+                consecutiveSyncFailures = 0;
+                const syncEl = document.getElementById("sync-status-label");
+                syncEl.innerText = "● LIVE";
+                syncEl.className = "text-emerald-400";
+
+                const serverNow = parseServerTimestamp(data.server_time);
+                serverTimeOffset = serverNow - Date.now();
+                document.getElementById("server-time-label").innerText = new Date(serverNow).toLocaleTimeString();
+
+                const r = data.round;
+                const newRound = r.id !== currentRoundId;
+
+                climbStartAt = data.climb_start_at;
+                const serverPhase = data.phase || 'idle';
+
+                if (newRound) {
+                    currentRoundId = r.id;
+                    currentMultiplier = 1.0;
+                    crashMultiplier = null;
+                    document.getElementById("active-round-label").innerText = `#${r.id}`;
+                    fetchHistoryAndRounds();
+                }
+
+                if (serverPhase === 'crashed' && r.crash_multiplier != null) {
+                    crashMultiplier = Number(r.crash_multiplier);
+                    currentMultiplier = crashMultiplier;
+                    if (lastPhase !== 'crashed') {
+                        updateRecentCrashesUI(crashMultiplier);
+                        fetchHistoryAndRounds();
+                    }
+                }
+
+                lastPhase = serverPhase;
+                phase = serverPhase;
+
+            } catch (e) {
+                consecutiveSyncFailures++;
+                if (consecutiveSyncFailures >= 3) {
+                    const syncEl = document.getElementById("sync-status-label");
+                    syncEl.innerText = "● OFFLINE";
+                    syncEl.className = "text-red-400";
+                }
+            }
+        }
+
+        function toggleGlobalMode() {
+            isGlobalMode = !isGlobalMode;
+            const badge = document.getElementById("mode-badge");
+            const historyModeLabel = document.getElementById("history-mode-label");
+
+            if (isGlobalMode) {
+                badge.innerText = "[ MODE: GLOBAL (AUTO) ]";
+                badge.className = "bg-amber-950/80 border border-amber-800 px-3 py-1 rounded text-xs font-mono font-bold text-amber-400 cursor-pointer hover:bg-amber-900 transition-colors";
+                historyModeLabel.innerText = "GLOBAL";
+            } else {
+                badge.innerText = "[ MODE: LOCAL ROUNDS ]";
+                badge.className = "bg-emerald-950/80 border border-emerald-800 px-3 py-1 rounded text-xs font-mono font-bold text-emerald-400 cursor-pointer hover:bg-emerald-900 transition-colors";
+                historyModeLabel.innerText = "LOCAL";
+            }
+            sync();
+            fetchHistoryAndRounds();
+        }
+
+        // ================================================================
+        //  BOOT — gated behind auth
+        // ================================================================
+        let bootStarted = false;
+
+        function bootApp() {
+            if (bootStarted) return;
+            bootStarted = true;
+
+            sync();
+            fetchHistoryAndRounds();
+            setInterval(sync, 700);
+            setInterval(fetchHistoryAndRounds, 4000);
+        }
+
+        function onAuthReady() {
+            bootApp();
+        }
+
+        (async () => {
+            AuthUI.showLogin();
+            const user = await Auth.verify();
+            if (user) {
+                AuthUI.onAuthenticated(user);
+            }
+        })();
+    </script>
+</body>
+
+</html>
