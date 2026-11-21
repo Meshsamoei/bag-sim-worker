@@ -751,7 +751,7 @@
 
                     const tr = document.createElement("tr");
                     tr.className = "hover:bg-slate-900/80 transition-colors cursor-pointer";
-                    tr.onclick = () => showRoundDetail(round);
+                    tr.onclick = () => showRoundDetail(round.id);
                     tr.innerHTML = `
                         <td class="px-3 sm:px-4 py-3 font-bold text-orange-400">#${round.id}</td>
                         <td class="px-3 sm:px-4 py-3 font-bold ${crashClass}">${isCrashed ? crash + "x" : "LIVE"}</td>
@@ -769,35 +769,45 @@
             }
         }
 
-        function showRoundDetail(round) {
-            const panel = document.getElementById("round-detail-panel");
-            const tbody = document.getElementById("round-bets-body");
-            tbody.innerHTML = "";
-
-            const bets = round.bets || [];
-            if (bets.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-slate-500">No bets for this round.</td></tr>`;
-            } else {
-                bets.forEach(bet => {
-                    const statusColor = bet.status === 'settled' ? "text-emerald-400" : bet.status === 'won' ? "text-emerald-400" : bet.status === 'busted' ? "text-red-400" : "text-slate-500";
-                    const payout = bet.won ? (Number(bet.stake) * Number(bet.multiplier || 1)).toFixed(2) : "0.00";
-                    const payoutClass = bet.won ? "text-emerald-400 font-bold" : "text-slate-500";
-
-                    const tr = document.createElement("tr");
-                    tr.innerHTML = `
-                        <td class="px-3 sm:px-4 py-3 font-mono font-bold text-orange-400">${bet.ticket_code}</td>
-                        <td class="px-3 sm:px-4 py-3 text-slate-300">${bet.customer_name}</td>
-                        <td class="px-3 sm:px-4 py-3 text-emerald-400 font-bold">KES ${Number(bet.stake).toFixed(2)}</td>
-                        <td class="px-3 sm:px-4 py-3 text-orange-400 font-bold">${Number(bet.multiplier || 1).toFixed(2)}x</td>
-                        <td class="px-3 sm:px-4 py-3 ${statusColor} font-bold">${bet.status}</td>
-                        <td class="px-3 sm:px-4 py-3 ${payoutClass}">KES ${payout}</td>
-                    `;
-                    tbody.appendChild(tr);
+        async function showRoundDetail(roundId) {
+            const user = Auth.getUser();
+            const shopId = user && user.shop_id ? user.shop_id : 'default';
+            try {
+                const res = await fetch(`${API_BASE}/api/round?id=${roundId}&mode=local&shop_id=${encodeURIComponent(shopId)}`, {
+                    cache: "no-store"
                 });
-            }
+                const data = await res.json();
+                const panel = document.getElementById("round-detail-panel");
+                const tbody = document.getElementById("round-bets-body");
+                tbody.innerHTML = "";
 
-            panel.classList.remove("hidden");
-            panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                if (!data.success || !data.round || !Array.isArray(data.round.bets) || data.round.bets.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-slate-500">No bets for this round.</td></tr>`;
+                } else {
+                    data.round.bets.forEach(bet => {
+                        const isWon = bet.won === true || (bet.status === 'won');
+                        const statusColor = bet.status === 'settled' ? "text-emerald-400" : isWon ? "text-emerald-400" : bet.status === 'busted' ? "text-red-400" : "text-slate-500";
+                        const payout = isWon ? (Number(bet.stake) * Number(bet.multiplier || 1)).toFixed(2) : "0.00";
+                        const payoutClass = isWon ? "text-emerald-400 font-bold" : "text-slate-500";
+
+                        const tr = document.createElement("tr");
+                        tr.innerHTML = `
+                            <td class="px-3 sm:px-4 py-3 font-mono font-bold text-orange-400">${bet.ticket_code}</td>
+                            <td class="px-3 sm:px-4 py-3 text-slate-300">${bet.customer_name}</td>
+                            <td class="px-3 sm:px-4 py-3 text-emerald-400 font-bold">KES ${Number(bet.stake).toFixed(2)}</td>
+                            <td class="px-3 sm:px-4 py-3 text-orange-400 font-bold">${Number(bet.multiplier || 1).toFixed(2)}x</td>
+                            <td class="px-3 sm:px-4 py-3 ${statusColor} font-bold">${bet.status}</td>
+                            <td class="px-3 sm:px-4 py-3 ${payoutClass}">KES ${payout}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
+
+                panel.classList.remove("hidden");
+                panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            } catch (e) {
+                console.error("Failed to load round bets:", e);
+            }
         }
 
         // ================================================================

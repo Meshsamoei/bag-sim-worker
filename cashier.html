@@ -204,6 +204,62 @@
 
     </main>
 
+    <!-- Local Rounds History Section (Cashier) -->
+    <section id="local-history-section" class="mt-6 p-3 sm:p-6 max-w-7xl w-full mx-auto z-10 hidden">
+        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-4 mb-6">
+                <div>
+                    <h2 class="font-mono font-bold text-xs text-amber-400 uppercase tracking-widest mb-1">Local Rounds History</h2>
+                    <p class="text-[10px] text-slate-400">All rounds for shop <span id="history-shop-id" class="font-bold text-orange-400">--</span></p>
+                </div>
+                <button onclick="fetchLocalHistory()" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded font-mono text-xs font-semibold cursor-pointer transition-colors">🔄 Refresh</button>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left font-mono text-[10px]">
+                    <thead class="bg-slate-950/60 text-slate-500 uppercase text-[9px] border-b border-slate-800">
+                        <tr>
+                            <th class="px-3 sm:px-4 py-2">Round #</th>
+                            <th class="px-3 sm:px-4 py-2">Crash</th>
+                            <th class="px-3 sm:px-4 py-2">Pool</th>
+                            <th class="px-3 sm:px-4 py-2">Shop</th>
+                            <th class="px-3 sm:px-4 py-2">Created</th>
+                            <th class="px-3 sm:px-4 py-2 text-right">Bets</th>
+                        </tr>
+                    </thead>
+                    <tbody id="local-history-body" class="divide-y divide-slate-800/60 text-slate-300">
+                        <!-- Populated via JS -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Bet detail for selected round -->
+            <div id="round-detail-panel" class="mt-6 hidden bg-slate-950 border border-slate-800 rounded-xl p-4">
+                <div class="flex justify-between items-center mb-3 border-b border-slate-800 pb-2">
+                    <h3 class="font-mono font-bold text-xs text-orange-400 uppercase tracking-widest">Round Bets</h3>
+                    <button onclick="document.getElementById('round-detail-panel').classList.add('hidden')" class="text-slate-500 hover:text-white font-bold">✕</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left font-mono text-[10px]">
+                        <thead class="bg-slate-950/60 text-slate-500 uppercase text-[9px] border-b border-slate-800">
+                            <tr>
+                                <th class="px-3 sm:px-4 py-2">Ticket</th>
+                                <th class="px-3 sm:px-4 py-2">Customer</th>
+                                <th class="px-3 sm:px-4 py-2">Stake</th>
+                                <th class="px-3 sm:px-4 py-2">Exit Mult</th>
+                                <th class="px-3 sm:px-4 py-2">Status</th>
+                                <th class="px-3 sm:px-4 py-2">Payout</th>
+                            </tr>
+                        </thead>
+                        <tbody id="round-bets-body" class="divide-y divide-slate-800/50">
+                            <!-- Populated via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <script>
         // ================================================================
         //  CONFIG
@@ -720,14 +776,102 @@
         // ================================================================
         let bootStarted = false;
 
+        async function fetchLocalHistory() {
+            try {
+                const user = Auth.getUser();
+                const shopId = user && user.shop_id ? user.shop_id : 'default';
+                document.getElementById("history-shop-id").innerText = shopId;
+
+                const res = await fetch(`${API_BASE}/api/history?mode=local&shop_id=${encodeURIComponent(shopId)}`, {
+                    cache: "no-store"
+                });
+                const data = await res.json();
+                const tbody = document.getElementById("local-history-body");
+                tbody.innerHTML = "";
+
+                if (!Array.isArray(data) || data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-slate-500">No local rounds yet.</td></tr>`;
+                    document.getElementById("local-history-section").classList.remove("hidden");
+                    return;
+                }
+
+                data.forEach(round => {
+                    const crash = round.crash_multiplier ? Number(round.crash_multiplier).toFixed(2) : "--";
+                    const isCrashed = round.crash_multiplier != null;
+                    const crashClass = isCrashed ? (Number(round.crash_multiplier) >= 2.0 ? "text-emerald-400" : "text-red-400") : "text-slate-500";
+                    const created = round.created_at ? new Date(round.created_at).toLocaleString() : "--";
+
+                    const tr = document.createElement("tr");
+                    tr.className = "hover:bg-slate-900/80 transition-colors cursor-pointer";
+                    tr.onclick = () => showRoundDetail(round.id);
+                    tr.innerHTML = `
+                        <td class="px-3 sm:px-4 py-3 font-bold text-orange-400">#${round.id}</td>
+                        <td class="px-3 sm:px-4 py-3 font-bold ${crashClass}">${isCrashed ? crash + "x" : "LIVE"}</td>
+                        <td class="px-3 sm:px-4 py-3 text-emerald-400 font-bold">KES ${Number(round.total_pool || 0).toFixed(2)}</td>
+                        <td class="px-3 sm:px-4 py-3 font-mono text-slate-500 text-[9px]">${round.shop_id || 'default'}</td>
+                        <td class="px-3 sm:px-4 py-3 text-slate-400 text-[9px]">${created}</td>
+                        <td class="px-3 sm:px-4 py-3 text-right font-bold text-slate-300">View</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                document.getElementById("local-history-section").classList.remove("hidden");
+            } catch (e) {
+                console.error("Failed to load local history:", e);
+            }
+        }
+
+        async function showRoundDetail(roundId) {
+            const user = Auth.getUser();
+            const shopId = user && user.shop_id ? user.shop_id : 'default';
+            try {
+                const res = await fetch(`${API_BASE}/api/round?id=${roundId}&mode=local&shop_id=${encodeURIComponent(shopId)}`, {
+                    cache: "no-store"
+                });
+                const data = await res.json();
+                const panel = document.getElementById("round-detail-panel");
+                const tbody = document.getElementById("round-bets-body");
+                tbody.innerHTML = "";
+
+                if (!data.success || !data.round || !Array.isArray(data.round.bets) || data.round.bets.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-slate-500">No bets for this round.</td></tr>`;
+                } else {
+                    data.round.bets.forEach(bet => {
+                        const isWon = bet.won === true || (bet.status === 'won');
+                        const statusColor = bet.status === 'settled' ? "text-emerald-400" : isWon ? "text-emerald-400" : bet.status === 'busted' ? "text-red-400" : "text-slate-500";
+                        const payout = isWon ? (Number(bet.stake) * Number(bet.multiplier || 1)).toFixed(2) : "0.00";
+                        const payoutClass = isWon ? "text-emerald-400 font-bold" : "text-slate-500";
+
+                        const tr = document.createElement("tr");
+                        tr.innerHTML = `
+                            <td class="px-3 sm:px-4 py-3 font-mono font-bold text-orange-400">${bet.ticket_code}</td>
+                            <td class="px-3 sm:px-4 py-3 text-slate-300">${bet.customer_name}</td>
+                            <td class="px-3 sm:px-4 py-3 text-emerald-400 font-bold">KES ${Number(bet.stake).toFixed(2)}</td>
+                            <td class="px-3 sm:px-4 py-3 text-orange-400 font-bold">${Number(bet.multiplier || 1).toFixed(2)}x</td>
+                            <td class="px-3 sm:px-4 py-3 ${statusColor} font-bold">${bet.status}</td>
+                            <td class="px-3 sm:px-4 py-3 ${payoutClass}">KES ${payout}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
+
+                panel.classList.remove("hidden");
+                panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            } catch (e) {
+                console.error("Failed to load round bets:", e);
+            }
+        }
+
         function bootApp() {
             if (bootStarted) return;
             bootStarted = true;
 
             sync();
             fetchHistoryAndRounds();
+            fetchLocalHistory();
             setInterval(sync, 700);
             setInterval(fetchHistoryAndRounds, 4000);
+            setInterval(fetchLocalHistory, 10000);
         }
 
         function onAuthReady() {
