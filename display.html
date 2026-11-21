@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bag-Sim Client Terminal</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        .grid-bg {
+            background-image: linear-gradient(to right, rgba(16, 185, 129, 0.1) 1px, transparent 1px), linear-gradient(to bottom, rgba(16, 185, 129, 0.1) 1px, transparent 1px);
+            background-size: 60px 60px;
+        }
+
+        .glow-green {
+            text-shadow: 0 0 30px rgba(16, 185, 129, 0.3), 0 0 60px rgba(16, 185, 129, 0.1);
+        }
+
+        .glow-red {
+            text-shadow: 0 0 30px rgba(239, 68, 68, 0.3), 0 0 60px rgba(239, 68, 68, 0.1);
+        }
+
+        /* Force normal zero (no slash/dot) for multiplier display */
+        .multiplier-text {
+            font-variant-numeric: normal;
+            font-feature-settings: "zero" 0;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        }
+
+        .glow-blue {
+            text-shadow: 0 0 30px rgba(59, 130, 246, 0.3), 0 0 60px rgba(59, 130, 246, 0.1);
+        }
+
+        .smooth-transition {
+            transition: color 0.2s ease, text-shadow 0.2s ease;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans flex flex-col justify-between grid-bg select-none">
+
+    <header class="flex flex-col sm:flex-row justify-between items-center px-4 sm:px-8 py-3 sm:py-4 bg-slate-900/80 border-b border-emerald-900/50 backdrop-blur-md z-10 gap-3">
+        <div class="flex items-center space-x-3">
+            <span class="text-emerald-400 font-mono font-bold tracking-wider text-xs sm:text-lg text-center sm:text-left">
+                SIMULATION TERMINAL
+            </span>
+        </div>
+        <div class="flex items-center space-x-4 sm:space-x-6">
+            <button onclick="toggleGlobalMode()" id="mode-badge" class="flex items-center space-x-2 bg-emerald-950/60 border border-emerald-800/60 px-3 py-1 rounded-md cursor-pointer hover:bg-emerald-900 transition-colors">
+                <span id="mode-dot" class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span id="mode-text" class="text-xs font-mono font-semibold text-emerald-400 uppercase tracking-widest">
+                    [ MODE: LOCAL ROUNDS ]
+                </span>
+            </button>
+            <div id="clock" class="font-mono text-xs sm:text-sm text-slate-400">--:--:--</div>
+        </div>
+    </header>
+
+    <main class="flex-1 flex flex-col items-center justify-center relative px-4 py-8">
+        <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
+            <div class="w-full h-full border-t border-b border-emerald-500"></div>
+        </div>
+
+        <div class="text-center z-10 space-y-3 max-w-full overflow-hidden">
+            <div id="multiplier-display" class="multiplier-text text-6xl sm:text-8xl md:text-9xl font-black font-mono tracking-tighter text-white glow-green smooth-transition break-all">
+                1.00x
+            </div>
+            <p id="round-status-text" class="text-xs font-mono text-emerald-500 uppercase tracking-widest">
+                SYNCHRONIZING WITH SERVER...
+            </p>
+            <p id="round-id-display" class="text-[10px] font-mono text-slate-500">Round #---</p>
+        </div>
+    </main>
+
+    <footer class="bg-slate-900/90 border-t border-emerald-900/50 px-4 sm:px-6 py-3 flex items-center space-x-3 overflow-x-auto z-10">
+        <span class="text-[10px] font-mono text-slate-500 uppercase tracking-widest whitespace-nowrap">Completed
+            Rounds:</span>
+        <div id="history-ticker" class="flex items-center space-x-2 overflow-x-auto pb-1"></div>
+    </footer>
+
+    <div id="pf-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-slate-900 border border-slate-700 w-full max-w-xl rounded-2xl p-6 shadow-2xl space-y-4 font-mono">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="text-sm font-bold text-emerald-400 flex items-center gap-2">
+                    🔒 Provably Fair Audit Data <span id="modal-round-id" class="text-slate-400"></span>
+                </h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-white font-bold text-xl px-2">&times;</button>
+            </div>
+            <div class="space-y-3 text-xs">
+                <div>
+                    <p class="text-slate-500 uppercase font-semibold text-[10px]">Crash Multiplier Outcome</p>
+                    <p id="modal-multiplier" class="text-sm font-bold text-emerald-300 mt-0.5"></p>
+                </div>
+                <div>
+                    <p class="text-slate-500 uppercase font-semibold text-[10px]">Server Seed</p>
+                    <p id="modal-server-seed" class="p-2 bg-slate-950 rounded border border-slate-800 text-slate-300 break-all select-all text-[11px]">
+                    </p>
+                </div>
+                <div>
+                    <p class="text-slate-500 uppercase font-semibold text-[10px]">Server Seed Hash</p>
+                    <p id="modal-server-hash" class="p-2 bg-slate-950 rounded border border-slate-800 text-orange-300 break-all select-all text-[11px]">
+                    </p>
+                </div>
+                <div>
+                    <p class="text-slate-500 uppercase font-semibold text-[10px]">Client Seed</p>
+                    <p id="modal-client-seed" class="p-2 bg-slate-950 rounded border border-slate-800 text-blue-300 break-all select-all text-[11px]">
+                    </p>
+                </div>
+            </div>
+            <div class="pt-2 flex justify-end">
+                <button onclick="closeModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-sans font-semibold cursor-pointer">
+                    Close Inspection
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ================================================================
+        //  CONFIG
+        // ================================================================
+        const API_BASE = window.__API_BASE__ || (location.protocol === "file:" ? "http://localhost:8787" : "https://worker.bagsim.co.ke");
+
+        // ================================================================
+        //  STATE — server is the single source of truth for phase
+        // ================================================================
+        let isGlobalMode = false;
+
+        // Shop ID from URL param (?local_id=<shop_id> or ?shop_id=<shop_id>) for multi-lounge support
+        const urlParams = new URLSearchParams(window.location.search);
+        const localId = urlParams.get('local_id') || urlParams.get('shop_id') || 'default';
+        const modeParam = urlParams.get('mode');
+
+        // Determine mode from URL: ?mode=global -> global, otherwise local
+        isGlobalMode = (modeParam === 'global');
+
+        // Phase machine, driven by the server's `phase` field
+        let phase = 'idle'; // 'idle' | 'countdown' | 'climbing' | 'crashed'
+        let lastPhase = 'idle';
+
+        // Server-provided timing anchors (epoch ms)
+        let climbStartAt = null; // when climbing begins
+
+        // Revealed crash value (null while live)
+        let crashMultiplier = null;
+
+        // Current animated multiplier (client-interpolated)
+        let currentMultiplier = 1.00;
+
+        // Current round identity
+        let currentRoundId = null;
+
+        // Estimated offset between server clock and local clock (ms)
+        let serverTimeOffset = 0;
+
+        // ================================================================
+        //  DOM
+        // ================================================================
+        const multDisplay = document.getElementById("multiplier-display");
+        const statusText = document.getElementById("round-status-text");
+        const roundIdDisplay = document.getElementById("round-id-display");
+        const clockEl = document.getElementById("clock");
+
+        // ================================================================
+        //  UTILITIES
+        // ================================================================
+        function parseServerTimestamp(str) {
+            if (!str) return Date.now();
+            let f = str.replace(' ', 'T');
+            if (!f.endsWith('Z')) f += 'Z';
+            return new Date(f).getTime();
+        }
+
+        // Estimated server time in ms, using the offset we learned
+        function estimatedServerNow() {
+            return Date.now() + serverTimeOffset;
+        }
+
+        // ================================================================
+        //  CLOCK (UI only, unrelated to game timing)
+        // ================================================================
+        setInterval(() => {
+            clockEl.innerText = new Date().toLocaleTimeString('en-US', {
+                hour12: false
+            });
+        }, 1000);
+
+        // ================================================================
+        //  MODE TOGGLE
+        // ================================================================
+        function toggleGlobalMode() {
+            isGlobalMode = !isGlobalMode;
+            const modeDot = document.getElementById("mode-dot");
+            const modeText = document.getElementById("mode-text");
+            const modeBadge = document.getElementById("mode-badge");
+
+            if (isGlobalMode) {
+                modeDot.className = "w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse";
+                modeText.className = "text-xs font-mono font-semibold text-amber-400 uppercase tracking-widest";
+                modeText.innerText = "[ MODE: GLOBAL (AUTO) ]";
+                modeBadge.className = "flex items-center space-x-2 bg-amber-950/60 border border-amber-800/60 px-3 py-1 rounded-md cursor-pointer hover:bg-amber-900 transition-colors";
+            } else {
+                modeDot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse";
+                modeText.className = "text-xs font-mono font-semibold text-emerald-400 uppercase tracking-widest";
+                modeText.innerText = "[ MODE: LOCAL ROUNDS ]";
+                modeBadge.className = "flex items-center space-x-2 bg-emerald-950/60 border border-emerald-800/60 px-3 py-1 rounded-md cursor-pointer hover:bg-emerald-900 transition-colors";
+            }
+
+            // Reset local state and re-sync immediately on mode switch
+            resetLocalState();
+            sync();
+        }
+
+        function resetLocalState() {
+            phase = 'idle';
+            lastPhase = 'idle';
+            climbStartAt = null;
+            crashMultiplier = null;
+            currentMultiplier = 1.00;
+            currentRoundId = null;
+            multDisplay.innerText = "1.00x";
+            multDisplay.className = "text-6xl sm:text-8xl md:text-9xl font-black font-mono tracking-tighter text-white glow-green smooth-transition break-all";
+            statusText.innerText = "SYNCHRONIZING WITH SERVER...";
+            roundIdDisplay.innerText = "Round #---";
+        }
+
+        // ================================================================
+        //  ANIMATION LOOP — purely local, driven by server anchors
+        // ================================================================
+        function animate() {
+            try {
+                const now = estimatedServerNow();
+
+                if (phase === 'countdown' && climbStartAt) {
+                    const remainingMs = Math.max(0, climbStartAt - now);
+                    const remainingSec = Math.ceil(remainingMs / 1000);
+
+                    if (multDisplay.dataset.phase !== 'countdown') {
+                        multDisplay.dataset.phase = 'countdown';
+                        multDisplay.className = "text-6xl sm:text-8xl md:text-9xl font-black font-mono tracking-tighter text-blue-400 glow-blue smooth-transition break-all";
+                    }
+                    multDisplay.innerText = `${remainingSec}s`;
+                    statusText.innerText = `ROUND #${currentRoundId ?? '---'} // PREPARING LAUNCH...`;
+
+                } else if (phase === 'climbing' && climbStartAt) {
+                    const elapsedSec = Math.max(0, (now - climbStartAt) / 1000);
+                    currentMultiplier = Math.exp(0.038 * elapsedSec);
+
+                    if (multDisplay.dataset.phase !== 'climbing') {
+                        multDisplay.dataset.phase = 'climbing';
+                        multDisplay.className = "text-6xl sm:text-8xl md:text-9xl font-black font-mono tracking-tighter text-white glow-green smooth-transition break-all";
+                    }
+                    multDisplay.innerText = `${currentMultiplier.toFixed(2)}x`;
+                    statusText.innerText = isGlobalMode ?
+                        `GLOBAL AUTO // MULTIPLIER CLIMBING` :
+                        `LOCAL ${localId.toUpperCase()} // MULTIPLIER CLIMBING`;
+
+                } else if (phase === 'crashed' && crashMultiplier != null) {
+                    if (multDisplay.dataset.phase !== 'crashed') {
+                        multDisplay.dataset.phase = 'crashed';
+                        multDisplay.className = "text-6xl sm:text-8xl md:text-9xl font-black font-mono tracking-tighter text-red-500 glow-red smooth-transition break-all";
+                        statusText.innerText = `CRASHED @ ${crashMultiplier.toFixed(2)}x`;
+                    }
+                    multDisplay.innerText = `${crashMultiplier.toFixed(2)}x`;
+                }
+
+            } catch (e) {
+                console.warn("animate frame error:", e);
+            }
+            requestAnimationFrame(animate);
+        }
+        requestAnimationFrame(animate);
+
+        // ================================================================
+        //  SYNC — fetch authoritative phase from server
+        // ================================================================
+        async function sync() {
+            try {
+                const modeQuery = isGlobalMode ? "global" : "local";
+                const url = isGlobalMode ?
+                    `${API_BASE}/api/state?mode=${modeQuery}` :
+                    `${API_BASE}/api/state?mode=${modeQuery}&shop_id=${encodeURIComponent(localId)}`;
+                const res = await fetch(url, {
+                    cache: "no-store"
+                });
+                const data = await res.json();
+
+                // Recalibrate clock offset on every sync
+                const serverNow = parseServerTimestamp(data.server_time);
+                serverTimeOffset = serverNow - Date.now();
+
+                if (!data.round) {
+                    phase = 'idle';
+                    return;
+                }
+
+                const r = data.round;
+
+                // Detect new round
+                if (r.id !== currentRoundId) {
+                    currentRoundId = r.id;
+                    currentMultiplier = 1.0;
+                    crashMultiplier = null;
+                }
+
+                // Refresh anchors from server
+                climbStartAt = data.climb_start_at;
+
+                // Trust the server's phase
+                phase = data.phase || 'idle';
+
+                // Once crashed, latch the revealed multiplier
+                if (phase === 'crashed' && r.crash_multiplier != null) {
+                    crashMultiplier = Number(r.crash_multiplier);
+                    currentMultiplier = crashMultiplier;
+
+                    // Fire crash side-effects exactly once per transition
+                    if (lastPhase !== 'crashed') {
+                        onCrash(crashMultiplier);
+                    }
+                }
+
+                lastPhase = phase;
+
+                // Update round id UI
+                roundIdDisplay.innerText = `Round #${r.id}`;
+
+                // History (independent endpoint)
+                const histUrl = isGlobalMode ?
+                    `${API_BASE}/api/history?mode=${modeQuery}` :
+                    `${API_BASE}/api/history?mode=${modeQuery}&shop_id=${encodeURIComponent(localId)}`;
+                const histRes = await fetch(histUrl, {
+                    cache: "no-store"
+                });
+                const histData = await histRes.json();
+                renderHistory(histData, r.id);
+
+            } catch (err) {
+                // Network hiccup — keep last-known state, try again on next tick
+                console.warn("sync error:", err);
+            }
+        }
+
+        // ================================================================
+        //  SIDE EFFECTS
+        // ================================================================
+        function onCrash(mult) {
+            // Small "flash" pulse on the crash number
+            multDisplay.animate(
+                [{
+                    transform: "scale(1)",
+                    opacity: 1
+                }, {
+                    transform: "scale(1.08)",
+                    opacity: 0.85
+                }, {
+                    transform: "scale(1)",
+                    opacity: 1
+                }], {
+                    duration: 320,
+                    easing: "ease-out"
+                }
+            );
+        }
+
+        // ================================================================
+        //  HISTORY RENDERING
+        // ================================================================
+        function renderHistory(rounds, currentActiveId) {
+            const ticker = document.getElementById("history-ticker");
+            ticker.innerHTML = "";
+            if (!Array.isArray(rounds)) return;
+
+            rounds.slice(0, 12).forEach(r => {
+                if (r.id === currentActiveId) return;
+                const val = (Number(r.crash_multiplier) || 1.00).toFixed(2);
+                const isHigh = Number(r.crash_multiplier) >= 2.0;
+                const pill = document.createElement("button");
+                pill.className = `px-2.5 py-1 rounded text-xs font-mono font-bold border transition-transform hover:scale-105 cursor-pointer whitespace-nowrap ${isHigh
+                    ? 'bg-emerald-950/80 border-emerald-600 text-emerald-400'
+                    : 'bg-red-950/80 border-red-800 text-red-400'
+                    }`;
+                pill.innerText = `${val}x`;
+                pill.onclick = () => openModal(r);
+                ticker.appendChild(pill);
+            });
+        }
+
+        // ================================================================
+        //  MODAL
+        // ================================================================
+        function openModal(round) {
+            document.getElementById("modal-round-id").innerText = `(Round #${round.id})`;
+            document.getElementById("modal-multiplier").innerText = `${(Number(round.crash_multiplier) || 1.00).toFixed(2)}x`;
+            document.getElementById("modal-server-seed").innerText = round.server_seed || 'Revealed post-round';
+            document.getElementById("modal-server-hash").innerText = round.server_seed_hash || 'N/A';
+            document.getElementById("modal-client-seed").innerText = round.client_seed || 'N/A';
+            document.getElementById("pf-modal").classList.remove("hidden");
+        }
+
+        function closeModal() {
+            document.getElementById("pf-modal").classList.add("hidden");
+        }
+
+        // ================================================================
+        //  BOOT
+        // ================================================================
+        sync();
+        setInterval(sync, 500);
+    </script>
+</body>
+
+</html>
