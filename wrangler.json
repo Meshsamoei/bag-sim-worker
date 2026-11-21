@@ -1,0 +1,9 @@
+{
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "bag-sim-db",
+      "database_id": "4de7ea9f-8eb4-453c-b5eb-28ad8fc4344f"
+    }
+  ]
+}
